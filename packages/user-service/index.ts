@@ -4,10 +4,12 @@ import bodyParser from 'body-parser'
 
 const app = express()
 const port = 3001
+const mongoPort = 27017
+const mongoHost = 'mongo'
 
 app.use(bodyParser.json())
 
-mongoose.connect('mongodb://localhost:27017/users').then(() => {
+mongoose.connect(`mongodb://${mongoHost}:${mongoPort}/users`).then(() => {
   console.log('Connected to MongoDB');
 }).catch((err) => {
   console.error('MongoDB connection error: ', err);

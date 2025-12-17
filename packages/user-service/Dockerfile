@@ -3,16 +3,17 @@
 FROM node:24-alpine AS builder
 
 # Install build tools that may be needed by some native modules
-RUN apk add --no-cache make g++ python3 git
+#RUN apk add --no-cache make g++ python3 git
 
 WORKDIR /repo
 
-# Copy root package files and the package's package.json first to leverage Docker layer caching
-COPY package*.json ./
-COPY packages/user-service/package*.json ./packages/user-service/
+# Copy root package*.json files
+COPY /package*.json ./
 
-# Copy the rest of the repo (source, tsconfig, etc.)
-COPY . .
+# Copy root TypeScript config
+COPY ./tsconfig.json ./
+
+COPY ./packages/user-service ./packages/user-service/
 
 # Install dependencies (handles monorepo workspaces defined in the root `package.json`)
 RUN npm ci --no-audit --no-fund

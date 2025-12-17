@@ -1,0 +1,21 @@
+services:
+  mongo:
+    image: mongodb/mongodb-community-server:8.0-ubi8
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+  
+  user-service:
+    build: 
+      context: ./
+      dockerfile: ./packages/user-service/Dockerfile
+    container_name: user-service
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:

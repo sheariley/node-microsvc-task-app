@@ -1,6 +1,6 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
-  "include": ["./*.ts", "./**/*.ts"],
+  "include": ["**/*.ts"],
   "compilerOptions": {
     // File Layout
     // "rootDir": "./src",
@@ -37,6 +37,6 @@
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
-    "skipLibCheck": true,
+    "skipLibCheck": true
   }
 }
