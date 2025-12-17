@@ -1,0 +1,12 @@
+{
+  "name": "user-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}
