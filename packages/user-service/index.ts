@@ -20,6 +20,11 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema)
 
+// used for container health-check
+app.get('/ping', async (req, res) => {
+  res.status(200).json({ timestamp: Date.now() })
+})
+
 app.get('/users', async (req, res) => {
   const users = await User.find()
   res.json(users)
