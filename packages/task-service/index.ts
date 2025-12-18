@@ -23,6 +23,11 @@ async function main() {
   const TaskSchema = new mongoose.Schema({
     userId: String,
     title: String,
+    description: String,
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
     completed: Boolean,
   })
 
@@ -63,10 +68,10 @@ async function main() {
 
   app.post('/users/:userId/tasks', async (req, res) => {
     const {userId} = req.params
-    const {title, completed} = req.body
+    const {title, description, createdAt, completed} = req.body
 
     try {
-      const task = new Task({userId, title, completed})
+      const task = new Task({userId, title, description, createdAt, completed})
       await task.save()
       res.status(201).json(task)
     } catch(error) {
@@ -78,10 +83,10 @@ async function main() {
 
   app.put('/users/:userId/tasks/:taskId', async (req, res) => {
     const {taskId} = req.params
-    const {title, completed} = req.body
+    const {title, description, completed} = req.body
 
     try {
-      const task = await Task.findByIdAndUpdate(taskId, { title, completed })
+      const task = await Task.findByIdAndUpdate(taskId, { title, description, completed })
         .where('userId')
         .equals(req.params.userId)
       
