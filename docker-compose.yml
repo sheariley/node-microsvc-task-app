@@ -5,7 +5,7 @@ services:
     image: mongodb/mongodb-community-server:8.0-ubi8
     container_name: mongo
     ports:
-      - "27017:27017"
+      - "${MONGODB_PORT}:27017"
     volumes:
       - mongo_data:/data/db
     restart: unless-stopped
@@ -14,22 +14,22 @@ services:
     image: rabbitmq:4.2-management-alpine
     container_name: rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_WEB_PORT}:15672"
     restart: unless-stopped
 
   smtp-server:
     environment:
-      - MAILDEV_SMTP_PORT=1025
-      - SMTP_USER=maildevuser
-      - SMTP_PASS=maildevpass
-      - MAILDEV_WEB_PORT=1080
+      - MAILDEV_SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - MAILDEV_WEB_PORT=${MAILDEV_WEB_PORT}
     image: maildev/maildev:latest
     container_name: smtp-server
     user: root
     ports:
-      - "1080:1080"   # Web UI
-      - "1025:1025"   # SMTP server
+      - "${MAILDEV_WEB_PORT}:1080"   # Web UI
+      - "${SMTP_PORT}:1025"   # SMTP server
     volumes:
       - mail_data:/maildata
     command: [
@@ -42,32 +42,32 @@ services:
 
   user-service:
     environment:
-      - MONGODB_HOST=mongo
-      - MONGODB_PORT=27017
+      - MONGODB_HOST=${MONGODB_HOST}
+      - MONGODB_PORT=${MONGODB_PORT}
     build: 
       context: ./
       dockerfile: ./services/user-service/Dockerfile
     container_name: user-service
     ports:
-      - "3001:3001"
+      - "${USER_SVC_PORT}:3001"
     depends_on:
       - mongo
     restart: unless-stopped
 
   task-service:
     environment:
-      - MONGODB_HOST=mongo
-      - MONGODB_PORT=27017
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_TASK_CREATED_QUEUE_NAME=task_created
-      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=task_updated
+      - MONGODB_HOST=${MONGODB_HOST}
+      - MONGODB_PORT=${MONGODB_PORT}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_PORT=${RABBITMQ_PORT}
+      - RABBITMQ_TASK_CREATED_QUEUE_NAME=${RABBITMQ_TASK_CREATED_QUEUE_NAME}
+      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=${RABBITMQ_TASK_UPDATED_QUEUE_NAME}
     build: 
       context: ./
       dockerfile: ./services/task-service/Dockerfile
     container_name: task-service
     ports:
-      - "3002:3002"
+      - "${TASK_SVC_PORT}:3002"
     depends_on:
       - mongo
       - rabbitmq
@@ -76,16 +76,16 @@ services:
   notification-service:
     environment:
       - NOTIFY_FROM_EMAIL=noreply@notification-service.local
-      - MONGODB_HOST=mongo
-      - MONGODB_PORT=27017
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_TASK_CREATED_QUEUE_NAME=task_created
-      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=task_updated
-      - SMTP_HOST=smtp-server
-      - SMTP_PORT=1025
-      - SMTP_USER=maildevuser
-      - SMTP_PASS=maildevpass
+      - MONGODB_HOST=${MONGODB_HOST}
+      - MONGODB_PORT=${MONGODB_PORT}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_PORT=${RABBITMQ_PORT}
+      - RABBITMQ_TASK_CREATED_QUEUE_NAME=${RABBITMQ_TASK_CREATED_QUEUE_NAME}
+      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=${RABBITMQ_TASK_UPDATED_QUEUE_NAME}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
     build: 
       context: ./
       dockerfile: ./services/notification-service/Dockerfile
