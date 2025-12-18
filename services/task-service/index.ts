@@ -129,7 +129,7 @@ async function main() {
     const { title, description, completed } = req.body
 
     try {
-      const task = await Task.findByIdAndUpdate(taskId, { title, description, completed })
+      const task = await Task.findByIdAndUpdate(taskId, { title, description, completed }, { new: true })
         .where('userId')
         .equals(userId)
 
