@@ -1,10 +1,10 @@
 {
-  "name": "user-service",
+  "name": "task-service",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "tsc -p ./tsconfig.json",
-    "dev": "node --env-file=../../.env ./index.ts"
+    "start": "node ./index.ts"
   },
   "keywords": [],
   "author": "",

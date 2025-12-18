@@ -15,7 +15,9 @@ Build a task management app composed of containerized micro-services that allows
   - Express + Mongoose: Users Web API server
   - MongoDB: Users database
 - Routes
+  - GET /ping - Health check for container auto-restart
   - GET /users - fetch all users
+  - GET /users/:userId - fetch user by ID
   - POST /users - Create new user
 
 ## Task Service
@@ -23,4 +25,8 @@ Build a task management app composed of containerized micro-services that allows
   - Express + Mongoose: Tasks Web API server
   - MongoDB: Users database
 - Routes
-  - 
+  - GET /ping - Health check for container auto-restart
+  - GET /users/:userId/tasks - List all tasks for a user
+  - GET /users/:userId/tasks/:taskId - Get single task by ID for a user
+  - POST /users/:userId/tasks - Create task for user
+  - PUT /users/:userId/tasks/:taskId - Update a task for a user

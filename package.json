@@ -6,7 +6,8 @@
     "start:user-service": "node ./packages/user-service/index.ts"
   },
   "workspaces": [
-    "packages/user-service"
+    "packages/user-service",
+    "packages/task-service"
   ],
   "dependencies": {
     "body-parser": "^2.2.1",

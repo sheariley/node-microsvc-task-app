@@ -4,72 +4,69 @@ import bodyParser from 'body-parser'
 
 const app = express()
 const port = 3001
-const mongoPort = 27017
-const mongoHost = 'mongo'
+const mongoPort = Number(process.env.MONGODB_PORT)
+const mongoHost = process.env.MONGODB_HOST
+const mongoConString = `mongodb://${mongoHost}:${mongoPort}/users`;
 
 app.use(bodyParser.json())
 
-mongoose.connect(`mongodb://${mongoHost}:${mongoPort}/users`).then(() => {
-  console.log('Connected to MongoDB');
-}).catch((err) => {
-  console.error('MongoDB connection error: ', err);
-})
-
-const UserSchema = new mongoose.Schema({
-  name: String,
-  email: String
-})
-
-const User = mongoose.model('User', UserSchema)
-
-// used for container health-check
-app.get('/ping', async (req, res) => {
-  res.status(200).json({ timestamp: Date.now() })
-})
-
-app.get('/users', async (req, res) => {
-  const users = await User.find()
-  res.json(users)
-})
-
-app.get('/users/:userId', async (req, res) => {
+async function main() {
+  console.log(`Connecting to MongoDB at ${mongoConString}...`)
   try {
-    const results = await User.find().where('_id').equals(req.params.userId)
-    if (!results?.length) {
-      res.status(404).json({ error: `User with Id "${req.params.userId}" not found` })
-    } else {
-      res.json(results[0])
-    }
+    await mongoose.connect(mongoConString)
+    console.log('Connected to MongoDB');
   } catch (error) {
-    const reason = error instanceof Error ? error.message : (error as any).toString()
-    res.status(500).json({ message: 'Internal Server Error', reason })
+    console.error('MongoDB connection error: ', error);
+    process.exit(1)
   }
-})
 
-app.post('/users', async (req, res) => {
-  const {name, email} = req.body
+  const UserSchema = new mongoose.Schema({
+    name: String,
+    email: String
+  })
 
-  try {
-    const user = new User({name, email})
-    await user.save()
-    res.status(201).json(user)
-  } catch(error) {
-    console.error('Error saving: ', error)
-    res.status(500).json({ error: 'Internal Server Error' })
-  }
-})
+  const User = mongoose.model('User', UserSchema)
 
-app.listen(port, () => {
-  console.log(`User service listening on port ${port}`)
-})
+  // used for container health-check
+  app.get('/ping', async (req, res) => {
+    res.status(200).json({ timestamp: Date.now() })
+  })
 
+  app.get('/users', async (req, res) => {
+    const users = await User.find()
+    res.json(users)
+  })
 
-// Command to run temp local instance of MongoDB
-/*
-Bash:
-export MONGODB_VERSION=8.0-ubi8
-docker run --name mongodb -d -p 27017:27017 mongodb/mongodb-community-server:$MONGODB_VERSION
+  app.get('/users/:userId', async (req, res) => {
+    try {
+      const results = await User.find().where('_id').equals(req.params.userId)
+      if (!results?.length) {
+        res.status(404).json({ error: `User with Id "${req.params.userId}" not found` })
+      } else {
+        res.json(results[0])
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : (error as any).toString()
+      res.status(500).json({ message: 'Internal Server Error', reason })
+    }
+  })
 
-Powershell:
-$env:MONGODB_VERSION="8.0-ubi8"; docker run --name mongodb -d -p 27017:27017 mongodb/mongodb-community-server:$env:MONGODB_VERSION
-*/
+  app.post('/users', async (req, res) => {
+    const {name, email} = req.body
+
+    try {
+      const user = new User({name, email})
+      await user.save()
+      res.status(201).json(user)
+    } catch(error) {
+      console.error('Error saving: ', error)
+      res.status(500).json({ error: 'Internal Server Error' })
+    }
+  })
+
+  app.listen(port, () => {
+    console.log(`User service listening on port ${port}`)
+  })
+}
+
+main()

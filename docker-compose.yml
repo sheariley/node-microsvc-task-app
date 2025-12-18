@@ -8,12 +8,28 @@ services:
       - mongo_data:/data/db
   
   user-service:
+    environment:
+      - MONGODB_HOST=mongo
+      - MONGODB_PORT=27017
     build: 
       context: ./
       dockerfile: ./packages/user-service/Dockerfile
     container_name: user-service
     ports:
       - "3001:3001"
+    depends_on:
+      - mongo
+
+  task-service:
+    environment:
+      - MONGODB_HOST=mongo
+      - MONGODB_PORT=27017
+    build: 
+      context: ./
+      dockerfile: ./packages/task-service/Dockerfile
+    container_name: task-service
+    ports:
+      - "3002:3002"
     depends_on:
       - mongo
 
