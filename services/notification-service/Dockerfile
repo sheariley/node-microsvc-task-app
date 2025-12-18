@@ -13,16 +13,16 @@ COPY /package*.json ./
 # Copy root TypeScript config
 COPY ./tsconfig.json ./
 
-# Copy root package-lock.json to service source dir
-COPY /package-lock.json ./services/notification-service
-
 # Copy service source code
 COPY ./services/notification-service ./services/notification-service/
 
-# Install dependencies (handles monorepo workspaces defined in the root `package.json`)
-RUN npm ci --no-audit --no-fund
+# Copy root package-lock.json to service source dir
+COPY /package-lock.json ./services/notification-service/
 
-# Build only the notification-service workspace (runs the package's `build` script which should run tsc)
+# Install dependencies
+RUN npm install --no-audit --no-fund
+
+# Build only the notification-service workspace
 RUN npm run build --workspace=services/notification-service
 
 # Stage 2: runtime / artifact output

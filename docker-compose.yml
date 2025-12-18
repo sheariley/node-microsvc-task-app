@@ -6,6 +6,13 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:4.2-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
   
   user-service:
     environment:
@@ -24,6 +31,10 @@ services:
     environment:
       - MONGODB_HOST=mongo
       - MONGODB_PORT=27017
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_TASK_CREATED_QUEUE_NAME=task_created
+      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=task_updated
     build: 
       context: ./
       dockerfile: ./services/task-service/Dockerfile
@@ -32,6 +43,20 @@ services:
       - "3002:3002"
     depends_on:
       - mongo
+      - rabbitmq
+
+  notification-service:
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_TASK_CREATED_QUEUE_NAME=task_created
+      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=task_updated
+    build: 
+      context: ./
+      dockerfile: ./services/notification-service/Dockerfile
+    container_name: notification-service
+    depends_on:
+      - rabbitmq
 
 volumes:
   mongo_data:

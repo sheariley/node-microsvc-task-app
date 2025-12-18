@@ -8,6 +8,7 @@
     "start:notification-service": "npm run dev --workspace=services/notification-service"
   },
   "workspaces": [
+    "/packages/ms-task-app-shared",
     "/services/user-service",
     "/services/task-service",
     "/services/notification-service"

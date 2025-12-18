@@ -13,16 +13,16 @@ COPY /package*.json ./
 # Copy root TypeScript config
 COPY ./tsconfig.json ./
 
-# Copy root package-lock.json to service source dir
-COPY /package-lock.json ./services/task-service
-
 # Copy service source code
 COPY ./services/task-service ./services/task-service/
 
-# Install dependencies (handles monorepo workspaces defined in the root `package.json`)
-RUN npm ci --no-audit --no-fund
+# Copy root package-lock.json to service source dir
+COPY /package-lock.json ./services/task-service/
 
-# Build only the task-service workspace (runs the package's `build` script which should run tsc)
+# Install dependencies
+RUN npm install --no-audit --no-fund
+
+# Build only the task-service workspace
 RUN npm run build --workspace=services/task-service
 
 # Stage 2: runtime / artifact output

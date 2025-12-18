@@ -2,15 +2,15 @@ import express from 'express'
 import mongoose from 'mongoose'
 import bodyParser from 'body-parser'
 
-const app = express()
 const port = 3001
-const mongoPort = Number(process.env.MONGODB_PORT)
-const mongoHost = process.env.MONGODB_HOST
+const mongoPort = Number(process.env.MONGODB_PORT || 27017)
+const mongoHost = process.env.MONGODB_HOST || 'localhost'
 const mongoConString = `mongodb://${mongoHost}:${mongoPort}/users`;
 
-app.use(bodyParser.json())
-
 async function main() {
+  const app = express()
+  app.use(bodyParser.json())
+
   console.log(`Connecting to MongoDB at ${mongoConString}...`)
   try {
     await mongoose.connect(mongoConString)
