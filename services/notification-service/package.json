@@ -17,6 +17,7 @@
     "mongoose": "^9.0.1"
   },
   "devDependencies": {
-    "@types/amqplib": "^0.10.8"
+    "@types/amqplib": "^0.10.8",
+    "ms-task-app-shared": "0.0.0"
   }
 }

@@ -13,6 +13,9 @@ COPY /package*.json ./
 # Copy root TypeScript config
 COPY ./tsconfig.json ./
 
+# Copy shared package source code
+COPY ./packages/ms-task-app-shared ./packages/ms-task-app-shared/
+
 # Copy service source code
 COPY ./services/task-service ./services/task-service/
 
