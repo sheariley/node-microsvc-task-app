@@ -1,3 +1,5 @@
+name: micro-service-task-app
+
 services:
   mongo:
     image: mongodb/mongodb-community-server:8.0-ubi8
@@ -6,6 +8,7 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:4.2-management-alpine
@@ -13,7 +16,30 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-  
+    restart: unless-stopped
+
+  smtp-server:
+    environment:
+      - MAILDEV_SMTP_PORT=1025
+      - SMTP_USER=maildevuser
+      - SMTP_PASS=maildevpass
+      - MAILDEV_WEB_PORT=1080
+    image: maildev/maildev:latest
+    container_name: smtp-server
+    user: root
+    ports:
+      - "1080:1080"   # Web UI
+      - "1025:1025"   # SMTP server
+    volumes:
+      - mail_data:/maildata
+    command: [
+      "maildev",
+      "--mail-directory", "/maildata",
+      "--incoming-user", "${SMTP_USER}",
+      "--incoming-pass", "${SMTP_PASS}"
+    ]
+    restart: unless-stopped
+
   user-service:
     environment:
       - MONGODB_HOST=mongo
@@ -26,6 +52,7 @@ services:
       - "3001:3001"
     depends_on:
       - mongo
+    restart: unless-stopped
 
   task-service:
     environment:
@@ -44,6 +71,7 @@ services:
     depends_on:
       - mongo
       - rabbitmq
+    restart: unless-stopped
 
   notification-service:
     environment:
@@ -51,12 +79,19 @@ services:
       - RABBITMQ_PORT=5672
       - RABBITMQ_TASK_CREATED_QUEUE_NAME=task_created
       - RABBITMQ_TASK_UPDATED_QUEUE_NAME=task_updated
+      - SMTP_HOST=smtp-server
+      - SMTP_PORT=1025
+      - SMTP_USER=maildevuser
+      - SMTP_PASS=maildevpass
     build: 
       context: ./
       dockerfile: ./services/notification-service/Dockerfile
     container_name: notification-service
     depends_on:
       - rabbitmq
+      - smtp-server
+    restart: unless-stopped
 
 volumes:
   mongo_data:
+  mail_data:
