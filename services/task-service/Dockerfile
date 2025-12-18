@@ -13,6 +13,10 @@ COPY /package*.json ./
 # Copy root TypeScript config
 COPY ./tsconfig.json ./
 
+# Copy root package-lock.json to service source dir
+COPY /package-lock.json ./services/task-service
+
+# Copy service source code
 COPY ./services/task-service ./services/task-service/
 
 # Install dependencies (handles monorepo workspaces defined in the root `package.json`)

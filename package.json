@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "start:user-service": "npm run dev --workspace=services/user-service",
-    "start:task-service": "npm run dev --workspace=services/task-service"
+    "start:task-service": "npm run dev --workspace=services/task-service",
+    "start:notification-service": "npm run dev --workspace=services/notification-service"
   },
   "workspaces": [
-    "services/user-service",
-    "services/task-service"
+    "/services/user-service",
+    "/services/task-service",
+    "/services/notification-service"
   ],
   "dependencies": {
     "body-parser": "^2.2.1",
