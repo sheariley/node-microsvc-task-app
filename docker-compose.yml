@@ -13,7 +13,7 @@ services:
       - MONGODB_PORT=27017
     build: 
       context: ./
-      dockerfile: ./packages/user-service/Dockerfile
+      dockerfile: ./services/user-service/Dockerfile
     container_name: user-service
     ports:
       - "3001:3001"
@@ -26,7 +26,7 @@ services:
       - MONGODB_PORT=27017
     build: 
       context: ./
-      dockerfile: ./packages/task-service/Dockerfile
+      dockerfile: ./services/task-service/Dockerfile
     container_name: task-service
     ports:
       - "3002:3002"

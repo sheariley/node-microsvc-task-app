@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start:user-service": "node ./packages/user-service/index.ts"
+    "start:user-service": "npm run dev --workspace=services/user-service",
+    "start:task-service": "npm run dev --workspace=services/task-service"
   },
   "workspaces": [
-    "packages/user-service",
-    "packages/task-service"
+    "services/user-service",
+    "services/task-service"
   ],
   "dependencies": {
     "body-parser": "^2.2.1",
