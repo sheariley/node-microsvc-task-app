@@ -1,38 +1,37 @@
-import express from 'express'
-import mongoose from 'mongoose'
 import bodyParser from 'body-parser'
-import { coalesceErrorMsg } from 'ms-task-app-shared'
+import express from 'express'
+import { coalesceErrorMsg, connectMongoDbWithRetry } from 'ms-task-app-shared'
 
 const port = 3001
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
 const mongoHost = process.env.MONGODB_HOST || 'localhost'
-const mongoConString = `mongodb://${mongoHost}:${mongoPort}/users`;
 
 async function main() {
   const app = express()
   app.use(bodyParser.json())
 
-  console.log(`Connecting to MongoDB at ${mongoConString}...`)
-  try {
-    await mongoose.connect(mongoConString)
-    console.log('Connected to MongoDB');
-  } catch (error) {
-    console.error('MongoDB connection error: ', error);
+  const { connection: userDbCon, error: userDbConError } = (await connectMongoDbWithRetry({
+    host: mongoHost,
+    port: mongoPort,
+    dbName: 'users',
+  }))!
+
+  if (userDbConError || !userDbCon) {
     process.exit(1)
   }
 
-  const UserSchema = new mongoose.Schema({
+  const UserSchema = new userDbCon.Schema({
     name: {
       type: String,
-      required: true
+      required: true,
     },
     email: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   })
 
-  const User = mongoose.model('User', UserSchema)
+  const User = userDbCon.model('User', UserSchema)
 
   // used for container health-check
   app.get('/ping', async (req, res) => {
@@ -66,13 +65,13 @@ async function main() {
   })
 
   app.post('/users', async (req, res) => {
-    const {name, email} = req.body
+    const { name, email } = req.body
 
     try {
-      const user = new User({name, email})
+      const user = new User({ name, email })
       await user.save()
       res.status(201).json(user)
-    } catch(error) {
+    } catch (error) {
       console.error('Error saving: ', error)
       const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })

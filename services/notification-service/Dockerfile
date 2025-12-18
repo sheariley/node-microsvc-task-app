@@ -2,9 +2,6 @@
 # Stage 1: build
 FROM node:24-alpine AS builder
 
-# Install build tools that may be needed by some native modules
-#RUN apk add --no-cache make g++ python3 git
-
 WORKDIR /repo
 
 # Copy root package*.json files
@@ -25,7 +22,10 @@ COPY /package-lock.json ./services/notification-service/
 # Install dependencies
 RUN npm install --no-audit --no-fund
 
-# Build only the notification-service workspace
+# Build the shared package 
+RUN npm run build --workspace=packages/ms-task-app-shared
+
+# Build the service workspace
 RUN npm run build --workspace=services/notification-service
 
 # Stage 2: runtime / artifact output
@@ -40,6 +40,11 @@ COPY --from=builder /repo/services/notification-service/dist ./dist
 # Copy the package.json for the runtime dependency installation
 COPY --from=builder /repo/services/notification-service/package.json ./package.json
 COPY --from=builder /repo/services/notification-service/package-lock.json ./package-lock.json
+
+# Ensure the built workspace package is present so `npm ci` can create the
+# expected linked dependency. Copy the compiled output and package metadata
+# from the builder stage.
+COPY --from=builder /repo/packages/ms-task-app-shared ./packages/ms-task-app-shared/
 
 ENV NODE_ENV=production
 

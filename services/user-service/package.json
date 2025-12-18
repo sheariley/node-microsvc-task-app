@@ -15,5 +15,10 @@
     "express": "^5.2.1",
     "mongoose": "^9.0.1",
     "ms-task-app-shared": "0.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3"
   }
 }

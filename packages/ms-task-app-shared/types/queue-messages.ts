@@ -5,5 +5,6 @@ export type TaskCreatedQueueMessage = {
 }
 
 export type TaskUpdatedQueueMessage = TaskCreatedQueueMessage & {
-  completed: boolean
+  description?: string | null | undefined
+  completed?: boolean | null | undefined
 }

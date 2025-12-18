@@ -1,0 +1,41 @@
+import mongoose from 'mongoose'
+import { wait } from '../util/wait.js'
+
+export type MongoDbConnectOptions = {
+  host: string
+  port: number
+  dbName: string
+  retries?: number
+  delay?: number
+}
+
+export async function connectMongoDbWithRetry({
+  host,
+  port,
+  dbName,
+  retries = 5,
+  delay = 3000,
+}: MongoDbConnectOptions) {
+  if (retries <= 0) throw new Error(`Invalid argument value: retries = ${retries}`)
+  if (delay <= 0) throw new Error(`Invalid argument value: delay = ${delay}`)
+
+  const uri = `mongodb://${host}:${port}/${dbName}`
+  while (retries) {
+    // wait for specified delay
+    await wait(delay)
+    try {
+      console.log(`Connecting to MongoDB at ${uri}...`)
+      const connection = await mongoose.connect(uri)
+      console.log('Connected to MongoDB')
+      return { connection, error: null }
+    } catch (error) {
+      console.error('MongoDB connection error: ', error)
+      retries--
+      if (retries > 0) {
+        console.log('Retrying connection. Retries left: ', retries)
+      } else {
+        return { connection: null, error }
+      }
+    }
+  }
+}
