@@ -6,11 +6,24 @@ export type MqConnectOptions = {
   port: number
   retries?: number
   delay?: number
+  initialDelay?: number
 }
 
-export async function connectMQWithRetry({ host, port, retries = 5, delay = 3000 }: MqConnectOptions) {
+export async function connectMQWithRetry({
+  host,
+  port,
+  retries = 5,
+  delay = 3000,
+  initialDelay = 7000,
+}: MqConnectOptions) {
   if (retries <= 0) throw new Error(`Invalid argument value: retries = ${retries}`)
   if (delay <= 0) throw new Error(`Invalid argument value: delay = ${delay}`)
+
+  if (initialDelay) {
+    console.log('Waiting for MQ server to start...')
+    // give the MQ server time to start
+    await wait(initialDelay)
+  }
 
   const uri = `amqp://${host}:${port}`
   while (retries) {
