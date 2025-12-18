@@ -1,6 +1,7 @@
 import express from 'express'
 import mongoose from 'mongoose'
 import bodyParser from 'body-parser'
+import { coalesceErrorMsg } from 'ms-task-app-shared'
 
 const port = 3001
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
@@ -21,8 +22,14 @@ async function main() {
   }
 
   const UserSchema = new mongoose.Schema({
-    name: String,
-    email: String
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    }
   })
 
   const User = mongoose.model('User', UserSchema)
@@ -33,8 +40,14 @@ async function main() {
   })
 
   app.get('/users', async (req, res) => {
-    const users = await User.find()
-    res.json(users)
+    try {
+      const users = await User.find()
+      res.json(users)
+    } catch (error) {
+      console.error('Error fetching users: ', error)
+      const reason = coalesceErrorMsg(error)
+      res.status(500).json({ error: true, message: 'Internal Server Error', reason })
+    }
   })
 
   app.get('/users/:userId', async (req, res) => {
@@ -46,8 +59,9 @@ async function main() {
         res.json(results[0])
       }
     } catch (error) {
-      const reason = error instanceof Error ? error.message : (error as any).toString()
-      res.status(500).json({ message: 'Internal Server Error', reason })
+      console.error('Error fetching user: ', error)
+      const reason = coalesceErrorMsg(error)
+      res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })
 
@@ -60,7 +74,8 @@ async function main() {
       res.status(201).json(user)
     } catch(error) {
       console.error('Error saving: ', error)
-      res.status(500).json({ error: 'Internal Server Error' })
+      const reason = coalesceErrorMsg(error)
+      res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })
 

@@ -2,7 +2,7 @@ import express from 'express'
 import mongoose from 'mongoose'
 import bodyParser from 'body-parser'
 import amqp from 'amqplib'
-import type { TaskCreatedQueueMessage, TaskUpdatedQueueMessage } from 'ms-task-app-shared'
+import { coalesceErrorMsg, wait, type TaskCreatedQueueMessage, type TaskUpdatedQueueMessage } from 'ms-task-app-shared'
 
 const port = 3002
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
@@ -15,6 +15,8 @@ const rabbitMQTaskCreatedQueueName = process.env.RABBITMQ_TASK_CREATED_QUEUE_NAM
 const rabbitMQTaskUpdatedQueueName = process.env.RABBITMQ_TASK_UPDATED_QUEUE_NAME ?? 'task_updated'
 
 async function connectRabbitMQWithRetry(retries = 5, delay = 3000) {
+  // wait for specified delay to avoid connection errors during initialization
+  await wait(delay)
   while (retries) {
     try {
       const mqConnection = await amqp.connect(rabbitMQConString)
@@ -29,7 +31,7 @@ async function connectRabbitMQWithRetry(retries = 5, delay = 3000) {
       retries--
       console.log('Retrying connection. Retries left: ', retries)
       // wait for specified delay
-      await new Promise(res => setTimeout(res, delay))
+      await wait(delay)
     }
   }
 }
@@ -48,8 +50,14 @@ async function main() {
   }
 
   const TaskSchema = new mongoose.Schema({
-    userId: String,
-    title: String,
+    userId: {
+      type: mongoose.Types.ObjectId,
+      required: true
+    },
+    title: {
+      type: String,
+      required: true
+    },
     description: String,
     createdAt: {
       type: Date,
@@ -84,7 +92,7 @@ async function main() {
         .equals(req.params.userId)
       res.json(tasks)
     } catch (error) {
-      const reason = error instanceof Error ? error.message : (error as any).toString()
+      const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })
@@ -100,7 +108,7 @@ async function main() {
         res.json(task)
       }
     } catch (error) {
-      const reason = error instanceof Error ? error.message : (error as any).toString()
+      const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })
@@ -122,8 +130,8 @@ async function main() {
 
       res.status(201).json(task)
     } catch(error) {
-      const reason = error instanceof Error ? error.message : (error as any).toString()
       console.error('Error saving: ', error)
+      const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })
@@ -151,8 +159,8 @@ async function main() {
       console.log('Task updated successfully', task)
       res.status(204).send()
     } catch (error) {
-      const reason = error instanceof Error ? error.message : (error as any).toString()
       console.error('Error saving: ', error)
+      const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })

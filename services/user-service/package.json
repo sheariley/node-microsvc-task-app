@@ -13,6 +13,7 @@
   "dependencies": {
     "body-parser": "^2.2.1",
     "express": "^5.2.1",
-    "mongoose": "^9.0.1"
+    "mongoose": "^9.0.1",
+    "ms-task-app-shared": "0.0.0"
   }
 }

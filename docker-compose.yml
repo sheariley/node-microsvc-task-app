@@ -75,6 +75,9 @@ services:
 
   notification-service:
     environment:
+      - NOTIFY_FROM_EMAIL=noreply@notification-service.local
+      - MONGODB_HOST=mongo
+      - MONGODB_PORT=27017
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
       - RABBITMQ_TASK_CREATED_QUEUE_NAME=task_created
@@ -88,6 +91,7 @@ services:
       dockerfile: ./services/notification-service/Dockerfile
     container_name: notification-service
     depends_on:
+      - mongo
       - rabbitmq
       - smtp-server
     restart: unless-stopped

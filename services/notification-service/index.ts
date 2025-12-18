@@ -1,6 +1,11 @@
 import amqp from 'amqplib'
+import mongoose from 'mongoose'
 import nodemailer from 'nodemailer'
-import type { TaskCreatedQueueMessage, TaskUpdatedQueueMessage } from 'ms-task-app-shared'
+import { coalesceErrorMsg, wait, type TaskCreatedQueueMessage, type TaskUpdatedQueueMessage } from 'ms-task-app-shared'
+
+const mongoPort = Number(process.env.MONGODB_PORT || 27017)
+const mongoHost = process.env.MONGODB_HOST || 'localhost'
+const mongoConString = `mongodb://${mongoHost}:${mongoPort}/users`;
 
 const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
 const rabbitMQPort = Number(process.env.RABBITMQ_PORT ?? 5672)
@@ -12,8 +17,11 @@ const smtpHost = process.env.SMTP_HOST ?? 'smtp-server'
 const smtpPort = Number(process.env.SMTP_PORT ?? 1025)
 const smtpUser = process.env.SMTP_USER ?? 'maildevuser'
 const smtpPass = process.env.SMTP_PASS ?? 'maildevpass'
+const notifyFromEmail = process.env.NOTIFY_FROM_EMAIL ?? 'noreply@notification-service.local'
 
 async function connectRabbitMQWithRetry(retries = 5, delay = 3000) {
+  // wait for specified delay to avoid connection errors during initialization
+  await wait(delay)
   while (retries) {
     try {
       const mqConnection = await amqp.connect(rabbitMQConString)
@@ -23,12 +31,12 @@ async function connectRabbitMQWithRetry(retries = 5, delay = 3000) {
       console.log('Connected to RabbitMQ')
       return { mqConnection, mqChannel }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : (error as any).toString()
+      const msg = coalesceErrorMsg(error)
       console.log('RabbitMQ Connection Error: ', msg)
       retries--
       console.log('Retrying connection. Retries left: ', retries)
       // wait for specified delay
-      await new Promise(res => setTimeout(res, delay))
+      await wait(delay)
     }
   }
 }
@@ -58,18 +66,51 @@ async function main() {
     process.exit(1)
   }
 
+  console.log(`Connecting to MongoDB at ${mongoConString}...`)
+  try {
+    await mongoose.connect(mongoConString)
+    console.log('Connected to MongoDB');
+  } catch (error) {
+    console.error('MongoDB connection error: ', error);
+    process.exit(1)
+  }
+
+  const UserSchema = new mongoose.Schema({
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    }
+  })
+
+  const User = mongoose.model('User', UserSchema)
+
   const mailTransport = createMailTransport()
 
   mqChannel.consume(rabbitMQTaskCreatedQueueName, async msg => {
     if (msg) {
-      const taskData: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
-      console.log('Notification: TASK CREATED: ', taskData)
-
       try {
-        // TODO: Look up user by userId and get their email to be used in sending the email
+        const taskData: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
+        console.log('Notification: TASK CREATED: ', taskData)
+
+        const user = await User.findOne().where('_id').equals(taskData.userId)
+        
+        if (!user) {
+          throw new Error(`User with ID ${taskData.userId} associated with task notification not found.`)
+        }
+
+        if (!user.email) {
+          console.warn(`User with ID ${taskData.userId} associated with task notification has no email address.`)
+          mqChannel.nack(msg)
+          return
+        }
+
         const mailResult = await mailTransport.sendMail({
-          from: 'noreply@notification-service.local',
-          to: 'user@task-service.local',
+          from: notifyFromEmail,
+          to: user.email,
           subject: 'A new task was created',
           text: `A new task was created for you! The title was "${taskData.title}".`
         })
@@ -79,7 +120,7 @@ async function main() {
           mqChannel.ack(msg)
         }
       } catch (error) {
-        const msg = error instanceof Error ? error.message : (error as any).toString()
+        const msg = coalesceErrorMsg(error)
         console.error('Error sending notification email: ', msg)
       }
     }
@@ -87,14 +128,25 @@ async function main() {
 
   mqChannel.consume(rabbitMQTaskUpdatedQueueName, async msg => {
     if (msg) {
-      const taskData: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
-      console.log('Notification: TASK UPDATED: ', taskData)
-
       try {
-        // TODO: Look up user by userId and get their email to be used in sending the email
+        const taskData: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
+        console.log('Notification: TASK UPDATED: ', taskData)
+
+        const user = await User.findOne().where('_id').equals(taskData.userId)
+        
+        if (!user) {
+          throw new Error(`User with ID ${taskData.userId} associated with task notification not found.`)
+        }
+
+        if (!user.email) {
+          console.warn(`User with ID ${taskData.userId} associated with task notification has no email address.`)
+          mqChannel.nack(msg)
+          return
+        }
+
         const mailResult = await mailTransport.sendMail({
-          from: 'noreply@notification-service.local',
-          to: 'user@task-service.local',
+          from: notifyFromEmail,
+          to: user.email,
           subject: 'A task was updated',
           text: `The task titled "${taskData.title}" was updated. Completed: ${taskData.completed}`
         })
@@ -104,7 +156,7 @@ async function main() {
           mqChannel.ack(msg)
         }
       } catch (error) {
-        const msg = error instanceof Error ? error.message : (error as any).toString()
+        const msg = coalesceErrorMsg(error)
         console.error('Error sending notification email: ', msg)
       }
     }
