@@ -1,0 +1,32 @@
+{
+  "name": "ms-task-app-entities",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "npx tsc -p ./tsconfig.json"
+  },
+  "dependencies": {
+    "ms-task-app-dto": "0.0.0",
+    "mongoose": "^9.0.1",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3"
+  }
+}

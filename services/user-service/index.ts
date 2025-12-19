@@ -1,5 +1,7 @@
 import bodyParser from 'body-parser'
 import express from 'express'
+import { mapDtoValidationErrors, UserInputDtoSchema, type UserInputDto } from 'ms-task-app-dto'
+import { UserModel } from 'ms-task-app-entities'
 import { coalesceErrorMsg, connectMongoDbWithRetry } from 'ms-task-app-shared'
 
 const port = 3001
@@ -20,19 +22,6 @@ async function main() {
     process.exit(1)
   }
 
-  const UserSchema = new userDbCon.Schema({
-    name: {
-      type: String,
-      required: true,
-    },
-    email: {
-      type: String,
-      required: true,
-    },
-  })
-
-  const User = userDbCon.model('User', UserSchema)
-
   // used for container health-check
   app.get('/ping', async (req, res) => {
     res.status(200).json({ timestamp: Date.now() })
@@ -40,7 +29,7 @@ async function main() {
 
   app.get('/users', async (req, res) => {
     try {
-      const users = await User.find()
+      const users = await UserModel.find()
       res.json(users)
     } catch (error) {
       console.error('Error fetching users: ', error)
@@ -51,7 +40,7 @@ async function main() {
 
   app.get('/users/:userId', async (req, res) => {
     try {
-      const results = await User.find().where('_id').equals(req.params.userId)
+      const results = await UserModel.find().where('_id').equals(req.params.userId)
       if (!results?.length) {
         res.status(404).json({ error: `User with Id "${req.params.userId}" not found` })
       } else {
@@ -65,10 +54,19 @@ async function main() {
   })
 
   app.post('/users', async (req, res) => {
-    const { name, email } = req.body
+    const inputDto = req.body as UserInputDto
 
+    const valResult = await UserInputDtoSchema.safeParseAsync(inputDto)
+
+    if (!valResult.success) {
+      res.status(400).json({
+        errors: mapDtoValidationErrors(valResult.error),
+      })
+    }
+
+    const { name, email } = inputDto
     try {
-      const user = new User({ name, email })
+      const user = new UserModel({ name, email })
       await user.save()
       res.status(201).json(user)
     } catch (error) {

@@ -1,6 +1,7 @@
 import bodyParser from 'body-parser'
 import express from 'express'
-import mongoose from 'mongoose'
+import { mapDtoValidationErrors, TaskInputDtoSchema, type TaskInputDto } from 'ms-task-app-dto'
+import { TaskModel } from 'ms-task-app-entities'
 import {
   coalesceErrorMsg,
   connectMongoDbWithRetry,
@@ -49,25 +50,6 @@ async function main() {
     process.exit(1)
   }
 
-  const TaskSchema = new taskDbCon.Schema({
-    userId: {
-      type: mongoose.Types.ObjectId,
-      required: true,
-    },
-    title: {
-      type: String,
-      required: true,
-    },
-    description: String,
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    completed: Boolean,
-  })
-
-  const Task = taskDbCon.model('Task', TaskSchema)
-
   // used for container health-check
   app.get('/ping', async (req, res) => {
     res.status(200).json({ timestamp: Date.now() })
@@ -75,7 +57,7 @@ async function main() {
 
   app.get('/users/:userId/tasks', async (req, res) => {
     try {
-      const tasks = await Task.find().where('userId').equals(req.params.userId)
+      const tasks = await TaskModel.find().where('userId').equals(req.params.userId)
       res.json(tasks)
     } catch (error) {
       const reason = coalesceErrorMsg(error)
@@ -85,7 +67,9 @@ async function main() {
 
   app.get('/users/:userId/tasks/:taskId', async (req, res) => {
     try {
-      const task = await Task.findById(req.params.taskId).where('userId').equals(req.params.userId)
+      const task = await TaskModel.findById(req.params.taskId)
+        .where('userId')
+        .equals(req.params.userId)
       if (!task) {
         return res.status(404).json({ error: true, message: 'Task not found' })
       } else {
@@ -99,10 +83,19 @@ async function main() {
 
   app.post('/users/:userId/tasks', async (req, res) => {
     const { userId } = req.params
-    const { title, description, createdAt, completed } = req.body
+    const inputDto = req.body as TaskInputDto
 
+    const valResult = await TaskInputDtoSchema.safeParseAsync(inputDto)
+
+    if (!valResult.success) {
+      res.status(400).json({
+        errors: mapDtoValidationErrors(valResult.error),
+      })
+    }
+
+    const { title, description, completed } = inputDto
     try {
-      const task = new Task({ userId, title, description, createdAt, completed })
+      const task = new TaskModel({ userId, title, description, completed, createdAt: new Date() })
       await task.save()
 
       if (!mqChannel) {
@@ -129,10 +122,19 @@ async function main() {
 
   app.put('/users/:userId/tasks/:taskId', async (req, res) => {
     const { taskId, userId } = req.params
-    const { title, description, completed } = req.body
+    const inputDto = req.body as Partial<TaskInputDto>
 
+    const valResult = await TaskInputDtoSchema.partial().safeParseAsync(inputDto)
+
+    if (!valResult.success) {
+      res.status(400).json({
+        errors: mapDtoValidationErrors(valResult.error),
+      })
+    }
+
+    const { title, description, completed } = inputDto
     try {
-      const task = await Task.findByIdAndUpdate(
+      const task = await TaskModel.findByIdAndUpdate(
         taskId,
         { title, description, completed },
         { new: true }

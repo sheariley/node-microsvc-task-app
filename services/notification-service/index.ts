@@ -1,3 +1,4 @@
+import { UserModel } from 'ms-task-app-entities'
 import {
   coalesceErrorMsg,
   connectMongoDbWithRetry,
@@ -61,19 +62,6 @@ async function main() {
     process.exit(1)
   }
 
-  const UserSchema = new userDbCon.Schema({
-    name: {
-      type: String,
-      required: true,
-    },
-    email: {
-      type: String,
-      required: true,
-    },
-  })
-
-  const User = userDbCon.model('User', UserSchema)
-
   const mailTransport = createMailTransport()
 
   mqChannel.consume(rabbitMQTaskCreatedQueueName, async msg => {
@@ -82,7 +70,7 @@ async function main() {
         const taskData: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
         console.log('Notification: TASK CREATED: ', taskData)
 
-        const user = await User.findOne().where('_id').equals(taskData.userId)
+        const user = await UserModel.findOne().where('_id').equals(taskData.userId)
 
         if (!user) {
           throw new Error(
@@ -124,7 +112,7 @@ async function main() {
         const taskData: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
         console.log('Notification: TASK UPDATED: ', taskData)
 
-        const user = await User.findOne().where('_id').equals(taskData.userId)
+        const user = await UserModel.findOne().where('_id').equals(taskData.userId)
 
         if (!user) {
           throw new Error(
