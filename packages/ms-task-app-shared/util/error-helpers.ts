@@ -9,5 +9,8 @@ export function coalesceErrorMsg(error: unknown, defaultMsg = 'Unknown error') {
 }
 
 export function isErrorLike(error: unknown): error is { message: string } {
-  return error instanceof Error || (typeof error === 'object' && !!error && typeof (error as any).message === 'string')
+  return (
+    error instanceof Error ||
+    (typeof error === 'object' && !!error && typeof (error as any).message === 'string')
+  )
 }

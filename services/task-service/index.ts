@@ -113,7 +113,10 @@ async function main() {
           userId,
           title,
         }
-        mqChannel.sendToQueue(rabbitMQTaskCreatedQueueName, Buffer.from(JSON.stringify(taskCreatedMsg)))
+        mqChannel.sendToQueue(
+          rabbitMQTaskCreatedQueueName,
+          Buffer.from(JSON.stringify(taskCreatedMsg))
+        )
       }
 
       res.status(201).json(task)
@@ -129,7 +132,11 @@ async function main() {
     const { title, description, completed } = req.body
 
     try {
-      const task = await Task.findByIdAndUpdate(taskId, { title, description, completed }, { new: true })
+      const task = await Task.findByIdAndUpdate(
+        taskId,
+        { title, description, completed },
+        { new: true }
+      )
         .where('userId')
         .equals(userId)
 
@@ -147,7 +154,10 @@ async function main() {
           description: task.description,
           completed: task.completed,
         }
-        mqChannel.sendToQueue(rabbitMQTaskUpdatedQueueName, Buffer.from(JSON.stringify(taskUpdatedMsg)))
+        mqChannel.sendToQueue(
+          rabbitMQTaskUpdatedQueueName,
+          Buffer.from(JSON.stringify(taskUpdatedMsg))
+        )
       }
 
       console.log('Task updated successfully', task)

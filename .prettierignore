@@ -2,3 +2,10 @@
 dist
 coverage
 node_modules
+.next
+
+# Ignore configuration:
+.yml
+tsconfig.json
+package*.json
+eslint.config.*

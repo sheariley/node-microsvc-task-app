@@ -38,7 +38,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "references": [
-    { "path": "./packages/ms-task-app-shared" }
-  ]
+  "references": [{ "path": "./packages/ms-task-app-shared" }]
 }

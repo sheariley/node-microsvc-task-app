@@ -9,7 +9,7 @@ export default defineConfig([
     files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],
     plugins: {
       js: jseslint,
-      '@typescript-eslint': tseslint.plugin
+      '@typescript-eslint': tseslint.plugin,
     },
     extends: ['js/recommended', '@typescript-eslint/recommended'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
@@ -17,9 +17,7 @@ export default defineConfig([
       quotes: ['warn', 'single'],
       semi: ['warn', 'never'],
     },
-    ignores: [
-      'ui/ms-task-app-web/**'
-    ]
+    ignores: ['ui/ms-task-app-web/**'],
   },
   globalIgnores([
     '**/dist/**',
@@ -30,5 +28,5 @@ export default defineConfig([
     '**/build/**',
     '**/next-env.d.ts',
   ]),
-  prettier
+  prettier,
 ])

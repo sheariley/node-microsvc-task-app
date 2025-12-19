@@ -85,11 +85,15 @@ async function main() {
         const user = await User.findOne().where('_id').equals(taskData.userId)
 
         if (!user) {
-          throw new Error(`User with ID ${taskData.userId} associated with task notification not found.`)
+          throw new Error(
+            `User with ID ${taskData.userId} associated with task notification not found.`
+          )
         }
 
         if (!user.email) {
-          console.warn(`User with ID ${taskData.userId} associated with task notification has no email address.`)
+          console.warn(
+            `User with ID ${taskData.userId} associated with task notification has no email address.`
+          )
           mqChannel.nack(msg)
           return
         }
@@ -123,11 +127,15 @@ async function main() {
         const user = await User.findOne().where('_id').equals(taskData.userId)
 
         if (!user) {
-          throw new Error(`User with ID ${taskData.userId} associated with task notification not found.`)
+          throw new Error(
+            `User with ID ${taskData.userId} associated with task notification not found.`
+          )
         }
 
         if (!user.email) {
-          console.warn(`User with ID ${taskData.userId} associated with task notification has no email address.`)
+          console.warn(
+            `User with ID ${taskData.userId} associated with task notification has no email address.`
+          )
           mqChannel.nack(msg)
           return
         }

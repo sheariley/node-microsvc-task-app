@@ -16,11 +16,11 @@ const eslintConfig = defineConfig([
   ]),
   {
     rules: {
-      'quotes': ['warn', 'single'],
-      'semi': ['warn', 'never']
-    }
+      quotes: ['warn', 'single'],
+      semi: ['warn', 'never'],
+    },
   },
-  prettier
+  prettier,
 ])
 
 export default eslintConfig
