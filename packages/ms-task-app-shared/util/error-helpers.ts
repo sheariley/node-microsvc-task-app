@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export function coalesceErrorMsg(error: unknown, defaultMsg = 'Unknown error') {
   return isErrorLike(error)
     ? error.message
