@@ -4,8 +4,16 @@ dist
 build
 .git
 .vscode
-.env
+.env*
 .DS_Store
 npm-debug.log
 yarn-error.log
 scratch.txt
+**/.next
+next-env.d.ts
+**/out
+**/coverage
+**/.DS_Store
+*.pem
+**/.vercel
+*.tsbuildinfo

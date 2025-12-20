@@ -103,6 +103,23 @@ services:
       - smtp-server
     restart: unless-stopped
 
+  web-ui:
+    environment:
+      - WEB_UI_PORT=${WEB_UI_PORT}
+      - USER_SVC_PORT=${USER_SVC_PORT}
+      - TASK_SVC_PORT=${TASK_SVC_PORT}
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+      target: runtime_web_ui
+    container_name: web-ui
+    ports:
+      - "${WEB_UI_PORT}:3000"
+    depends_on:
+      - user-service
+      - task-service
+    restart: unless-stopped
+
 volumes:
   mongo_data:
   mail_data:
