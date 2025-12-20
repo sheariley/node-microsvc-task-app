@@ -59,7 +59,7 @@ async function main() {
     const valResult = await UserInputDtoSchema.safeParseAsync(inputDto)
 
     if (!valResult.success) {
-      res.status(400).json({
+      return res.status(400).json({
         errors: mapDtoValidationErrors(valResult.error),
       })
     }

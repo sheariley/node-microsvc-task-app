@@ -28,25 +28,30 @@ services:
     container_name: smtp-server
     user: root
     ports:
-      - "${MAILDEV_WEB_PORT}:1080"   # Web UI
-      - "${SMTP_PORT}:1025"   # SMTP server
+      - "${MAILDEV_WEB_PORT}:1080" # Web UI
+      - "${SMTP_PORT}:1025" # SMTP server
     volumes:
       - mail_data:/maildata
-    command: [
-      "maildev",
-      "--mail-directory", "/maildata",
-      "--incoming-user", "${SMTP_USER}",
-      "--incoming-pass", "${SMTP_PASS}"
-    ]
+    command:
+      [
+        "maildev",
+        "--mail-directory",
+        "/maildata",
+        "--incoming-user",
+        "${SMTP_USER}",
+        "--incoming-pass",
+        "${SMTP_PASS}",
+      ]
     restart: unless-stopped
 
   user-service:
     environment:
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
-    build: 
+    build:
       context: ./
-      dockerfile: ./services/user-service/Dockerfile
+      dockerfile: ./Dockerfile
+      target: runtime_user_service
     container_name: user-service
     ports:
       - "${USER_SVC_PORT}:3001"
@@ -62,9 +67,10 @@ services:
       - RABBITMQ_PORT=${RABBITMQ_PORT}
       - RABBITMQ_TASK_CREATED_QUEUE_NAME=${RABBITMQ_TASK_CREATED_QUEUE_NAME}
       - RABBITMQ_TASK_UPDATED_QUEUE_NAME=${RABBITMQ_TASK_UPDATED_QUEUE_NAME}
-    build: 
+    build:
       context: ./
-      dockerfile: ./services/task-service/Dockerfile
+      dockerfile: ./Dockerfile
+      target: runtime_task_service
     container_name: task-service
     ports:
       - "${TASK_SVC_PORT}:3002"
@@ -86,9 +92,10 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
-    build: 
+    build:
       context: ./
-      dockerfile: ./services/notification-service/Dockerfile
+      dockerfile: ./Dockerfile
+      target: runtime_notification_service
     container_name: notification-service
     depends_on:
       - mongo

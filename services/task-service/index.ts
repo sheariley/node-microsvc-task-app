@@ -88,7 +88,7 @@ async function main() {
     const valResult = await TaskInputDtoSchema.safeParseAsync(inputDto)
 
     if (!valResult.success) {
-      res.status(400).json({
+      return res.status(400).json({
         errors: mapDtoValidationErrors(valResult.error),
       })
     }
@@ -127,7 +127,7 @@ async function main() {
     const valResult = await TaskInputDtoSchema.partial().safeParseAsync(inputDto)
 
     if (!valResult.success) {
-      res.status(400).json({
+      return res.status(400).json({
         errors: mapDtoValidationErrors(valResult.error),
       })
     }
