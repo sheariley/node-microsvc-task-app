@@ -1,5 +1,6 @@
 import bodyParser from 'body-parser'
 import express from 'express'
+import mongoose from 'mongoose'
 import { mapDtoValidationErrors, UserInputDtoSchema, type UserInputDto } from 'ms-task-app-dto'
 import { UserModel } from 'ms-task-app-entities'
 import { coalesceErrorMsg, connectMongoDbWithRetry } from 'ms-task-app-shared'
@@ -40,6 +41,11 @@ async function main() {
 
   app.get('/users/:userId', async (req, res) => {
     try {
+      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+      if (!mongoose.isValidObjectId(req.params.userId)) {
+        return res.status(404)
+      }
+      
       const results = await UserModel.find().where('_id').equals(req.params.userId)
       if (!results?.length) {
         res.status(404).json({ error: `User with Id "${req.params.userId}" not found` })

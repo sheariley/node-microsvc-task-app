@@ -1,5 +1,6 @@
 import bodyParser from 'body-parser'
 import express from 'express'
+import mongoose from 'mongoose'
 import { mapDtoValidationErrors, TaskInputDtoSchema, type TaskInputDto } from 'ms-task-app-dto'
 import { TaskModel } from 'ms-task-app-entities'
 import {
@@ -57,6 +58,11 @@ async function main() {
 
   app.get('/users/:userId/tasks', async (req, res) => {
     try {
+      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+      if (!mongoose.isValidObjectId(req.params.userId)) {
+        return res.status(404)
+      }
+
       const tasks = await TaskModel.find().where('userId').equals(req.params.userId)
       res.json(tasks)
     } catch (error) {
@@ -66,7 +72,13 @@ async function main() {
   })
 
   app.get('/users/:userId/tasks/:taskId', async (req, res) => {
+    const { userId, taskId } = req.params
     try {
+      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+      if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
+        return res.status(404)
+      }
+
       const task = await TaskModel.findById(req.params.taskId)
         .where('userId')
         .equals(req.params.userId)
@@ -83,6 +95,12 @@ async function main() {
 
   app.post('/users/:userId/tasks', async (req, res) => {
     const { userId } = req.params
+
+    // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+    if (!mongoose.isValidObjectId(req.params.userId)) {
+      return res.status(404)
+    }
+
     const inputDto = req.body as TaskInputDto
 
     const valResult = await TaskInputDtoSchema.safeParseAsync(inputDto)
@@ -122,6 +140,12 @@ async function main() {
 
   app.put('/users/:userId/tasks/:taskId', async (req, res) => {
     const { taskId, userId } = req.params
+
+    // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+    if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
+      return res.status(404)
+    }
+
     const inputDto = req.body as Partial<TaskInputDto>
 
     const valResult = await TaskInputDtoSchema.partial().safeParseAsync(inputDto)
@@ -169,6 +193,27 @@ async function main() {
       const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
+  })
+
+  app.delete('/users/:userId/tasks/:taskId', async (req, res) => {
+    const { taskId, userId } = req.params
+
+    // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+    if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
+      return res.status(404)
+    }
+
+    const task = await TaskModel.findByIdAndDelete(
+      taskId
+    )
+      .where('userId')
+      .equals(userId)
+
+    if (!task) {
+      return res.status(404).json({ error: true, message: 'Task not found' })
+    }
+
+    res.status(204).send()
   })
 
   app.listen(port, () => {
