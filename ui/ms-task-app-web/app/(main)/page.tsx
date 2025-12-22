@@ -1,7 +1,11 @@
-export default function Home() {
+export default function HomePage() {
   return (
     <div className="container">
-      <div>Hello world!</div>
+      
+      {/* Placeholder content to be replaced */}
+      <div>Landing Page</div>
+
+      
     </div>
   )
 }
