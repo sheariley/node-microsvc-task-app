@@ -12,6 +12,7 @@ Build a task management app composed of containerized micro-services that allows
 - Use MongoDB for the database(s) backing the web APIs
 - Everything will run in containers
   - Use docker-compose to orchestrate container pod and integrate the various individual containers
+- Authentication/Authorization: Since authentication and authorization aren't a priority in this project, we may elect to keep this as simple as possible
 
 ## Shared DTO library/package
 
@@ -64,14 +65,16 @@ Build a task management app composed of containerized micro-services that allows
 - Routes
   - GET - `/api/ping` - Health check for container auto-restart
   - Landing page - `/` - List of tasks with ability to mark tasks as completed, delete tasks, navigate to task detail page
-  - Task Detail Page - `/tasks/:taskId` - Task detail page to view/edit a task
-- Source paths
+  - Task Detail Page - `/tasks/[taskId]` - Task detail page to view/edit a task
+- Source code paths
   - `@/public` - Static files to be copied to server upon deployment
   - `@/lib` - Low-level, shared utility methods and types
+  - `@/lib/api-clients` - Web API clients that facilitate the interface between the web UI and the various services (i.e. user-service, task-service, etc...)
   - `@/app/components` - Custom UI components
   - `@/app/styles` - Custom CSS files, if any
   - `@/app/globals.css` - Root CSS file; defines Tailwind CSS variables and theme; imports any custom CSS files from `@/app/styles`
   - `@/app/providers.tsx` - Combines client-side providers to clean up the root layout.
   - `@/app/layout.tsx` - Root layout inherited by all other layouts
   - `@/app/(main)` - Main pages that use the standard layout (`@/app/(main)/layout.tsx`)
-
+  - `@/app/(main)/page.tsx` - Landing page (route: `/`)
+  - `@/app/(main)/tasks/[taskId]/page.tsx` - Task detail page (route: `/tasks/[taskId]`)
