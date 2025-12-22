@@ -12,7 +12,7 @@ Build a task management app composed of containerized micro-services that allows
 - Use MongoDB for the database(s) backing the web APIs
 - Everything will run in containers
   - Use docker-compose to orchestrate container pod and integrate the various individual containers
-- Authentication/Authorization: Since authentication and authorization aren't a priority in this project, we may elect to keep this as simple as possible
+- Authentication/Authorization: Use Auth.js (next-auth) to implement OAuth 2.0.
 
 ## Shared DTO library/package
 
