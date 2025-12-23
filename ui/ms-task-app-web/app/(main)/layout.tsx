@@ -1,6 +1,7 @@
 'use client'
 
-import { Navbar, NavbarBrand, NavbarContent, NavbarItem, Link, Button } from '@heroui/react'
+import { Link, Navbar, NavbarBrand, NavbarContent, NavbarItem } from '@heroui/react'
+import { SignInButton } from '../components/auth'
 import { Logo } from '../components/logo/logo'
 
 export default function MainLayout({
@@ -13,7 +14,7 @@ export default function MainLayout({
       <Navbar isBordered>
         <NavbarBrand>
           <Logo />
-          <p className="font-bold text-inherit">ACME</p>
+          <p className="font-bold text-inherit">ACME Task Management</p>
         </NavbarBrand>
         <NavbarContent className="hidden gap-4 sm:flex" justify="center">
           <NavbarItem>
@@ -24,16 +25,11 @@ export default function MainLayout({
         </NavbarContent>
         <NavbarContent justify="end">
           <NavbarItem className="hidden lg:flex">
-            <Link href="#">Login</Link>
-          </NavbarItem>
-          <NavbarItem>
-            <Button as={Link} color="primary" href="#" variant="flat">
-              Sign Up
-            </Button>
+            <SignInButton />
           </NavbarItem>
         </NavbarContent>
       </Navbar>
-      <main className="flex flex-col justify-start items-stretch py-8 sm:items-center sm:py-16">
+      <main className="flex flex-col items-stretch justify-start py-8 sm:items-center sm:py-16">
         {children}
       </main>
     </>

@@ -1,11 +1,24 @@
-export default function HomePage() {
+import { auth } from '@/auth'
+
+export default async function HomePage() {
+  const session = await auth()
+  const isAuthenticated = !!session?.user
+
   return (
     <div className="container">
-      
-      {/* Placeholder content to be replaced */}
-      <div>Landing Page</div>
-
-      
+      {!isAuthenticated ? (
+        <>
+          {/* Placeholder content to be replaced */}
+          <h1>Landing Page</h1>
+          <p>Please sign-in to get started.</p>
+        </>
+      ) : (
+        <>
+          {/* Placeholder content to be replaced */}
+          <h1>Landing Page</h1>
+          <p>Thanks for signing in. Your tasks should be displayed below.</p>
+        </>
+      )}
     </div>
   )
 }
