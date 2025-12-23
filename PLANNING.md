@@ -13,6 +13,7 @@ Build a task management app composed of containerized micro-services that allows
 - Everything will run in containers
   - Use docker-compose to orchestrate container pod and integrate the various individual containers
 - Authentication/Authorization: Use Auth.js (next-auth) to implement OAuth 2.0.
+  - Create an API gateway within NextJS web UI for performing auth checks before accessing internal microservice APIs
 
 ## Shared DTO library/package
 
