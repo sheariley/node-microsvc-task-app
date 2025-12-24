@@ -217,9 +217,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy pkg deps
-#COPY --from=build_web_ui /repo/node_modules ./node_modules
-
 COPY --from=build_web_ui /repo/package*.json ./
 
 COPY --from=build_web_ui /repo/ui/ms-task-app-web/package.json ./ui/ms-task-app-web/
