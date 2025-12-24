@@ -1,11 +1,11 @@
+import { coalesceErrorMsg } from 'ms-task-app-common'
 import { UserModel } from 'ms-task-app-entities'
 import {
-  coalesceErrorMsg,
   connectMongoDbWithRetry,
   connectMQWithRetry,
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
-} from 'ms-task-app-shared'
+} from 'ms-task-app-service-util'
 import nodemailer from 'nodemailer'
 
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import { wait } from '../util/wait.js'
+import { wait } from 'ms-task-app-common'
 
 export type MongoDbConnectOptions = {
   host: string

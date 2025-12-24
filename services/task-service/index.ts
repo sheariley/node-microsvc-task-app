@@ -1,15 +1,15 @@
 import bodyParser from 'body-parser'
 import express from 'express'
 import mongoose from 'mongoose'
+import { coalesceErrorMsg } from 'ms-task-app-common'
 import { mapDtoValidationErrors, TaskInputDtoSchema, type TaskInputDto } from 'ms-task-app-dto'
 import { TaskModel } from 'ms-task-app-entities'
 import {
-  coalesceErrorMsg,
   connectMongoDbWithRetry,
   connectMQWithRetry,
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
-} from 'ms-task-app-shared'
+} from 'ms-task-app-service-util'
 
 const port = 3002
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
@@ -203,11 +203,7 @@ async function main() {
       return res.status(404)
     }
 
-    const task = await TaskModel.findByIdAndDelete(
-      taskId
-    )
-      .where('userId')
-      .equals(userId)
+    const task = await TaskModel.findByIdAndDelete(taskId).where('userId').equals(userId)
 
     if (!task) {
       return res.status(404).json({ error: true, message: 'Task not found' })

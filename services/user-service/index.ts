@@ -1,9 +1,10 @@
 import bodyParser from 'body-parser'
 import express from 'express'
 import mongoose from 'mongoose'
+import { coalesceErrorMsg } from 'ms-task-app-common'
 import { mapDtoValidationErrors, UserInputDtoSchema, type UserInputDto } from 'ms-task-app-dto'
 import { UserModel } from 'ms-task-app-entities'
-import { coalesceErrorMsg, connectMongoDbWithRetry } from 'ms-task-app-shared'
+import { connectMongoDbWithRetry } from 'ms-task-app-service-util'
 
 const port = 3001
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
@@ -45,7 +46,7 @@ async function main() {
       if (!mongoose.isValidObjectId(req.params.userId)) {
         return res.status(404)
       }
-      
+
       const results = await UserModel.find().where('_id').equals(req.params.userId)
       if (!results?.length) {
         res.status(404).json({ error: `User with Id "${req.params.userId}" not found` })

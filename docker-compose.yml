@@ -108,6 +108,11 @@ services:
       - WEB_UI_PORT=${WEB_UI_PORT}
       - USER_SVC_PORT=${USER_SVC_PORT}
       - TASK_SVC_PORT=${TASK_SVC_PORT}
+      - AUTH_TRUST_HOST=true
+      - AUTH_URL=${AUTH_URL}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
+      - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
     build:
       context: ./
       dockerfile: ./Dockerfile

@@ -31,5 +31,5 @@
     "**/*.mts"
   ],
   "exclude": ["node_modules"],
-  "references": [{ "path": "../../packages/ms-task-app-shared" }]
+  "references": [{ "path": "../../packages/ms-task-app-service-util" }]
 }

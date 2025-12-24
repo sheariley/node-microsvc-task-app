@@ -1,0 +1,33 @@
+{
+  "name": "ms-task-app-service-util",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "npx tsc -p ./tsconfig.json"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "mongoose": "^9.0.1",
+    "ms-task-app-common": "0.0.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3"
+  }
+}

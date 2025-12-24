@@ -1,5 +1,5 @@
 import amqp from 'amqplib'
-import { wait } from '../util/wait.js'
+import { wait } from 'ms-task-app-common'
 
 export type MqConnectOptions = {
   host: string

@@ -15,9 +15,10 @@
     "body-parser": "^2.2.1",
     "express": "^5.2.1",
     "mongoose": "^9.0.1",
+    "ms-task-app-common": "0.0.0",
     "ms-task-app-dto": "0.0.0",
     "ms-task-app-entities": "0.0.0",
-    "ms-task-app-shared": "0.0.0"
+    "ms-task-app-service-util": "0.0.0"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",
