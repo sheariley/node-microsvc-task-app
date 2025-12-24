@@ -1,7 +1,7 @@
+import { auth } from '@/auth'
 import { matchAndResolveServiceBase } from '@/lib/api-routing'
-import { verifyJwtFromBearer } from '@/lib/auth'
 import { coalesceErrorMsg, HttpError } from 'ms-task-app-common'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 const HOP_BY_HOP = new Set([
   'connection',
@@ -14,20 +14,9 @@ const HOP_BY_HOP = new Set([
   'upgrade',
 ])
 
-async function proxyRequest(req: NextRequest) {
-  const auth = req.headers.get('authorization') || req.headers.get('Authorization')
-  if (!auth) {
+const proxyRequest = auth(async (req) => {
+  if (!req.auth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
-    await verifyJwtFromBearer(auth)
-  } catch (err) {
-    const details =
-      err && typeof err === 'object' && 'message' in err
-        ? String((err as { message?: unknown }).message)
-        : undefined
-    return NextResponse.json({ error: 'Unauthorized', details }, { status: 401 })
   }
 
   const urlObj = new URL(req.url)
@@ -124,7 +113,7 @@ async function proxyRequest(req: NextRequest) {
     status: forwarded.status,
     headers: respHeaders,
   })
-}
+})
 
 export const GET = proxyRequest
 export const POST = proxyRequest
