@@ -200,7 +200,7 @@ COPY ./ui/ms-task-app-web ./ui/ms-task-app-web/
 
 # Install dependencies
 RUN npm install --no-audit --no-fund
-RUN npm install --workspace=ui/ms-task-app-web lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl --save-dev
+RUN npm install --no-audit --no-fund --save-dev --workspace=ui/ms-task-app-web lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
