@@ -1,8 +1,8 @@
 import { HttpError } from 'ms-task-app-common'
 import { NextRequest } from 'next/server'
 
-type Predicate = (path: string, req: NextRequest) => boolean | Promise<boolean>
-type Matcher = RegExp | Predicate
+type PredicateRouteMatcher = (path: string, req: NextRequest) => boolean | Promise<boolean>
+type Matcher = RegExp | PredicateRouteMatcher
 // Service must be a fully assembled taget URL string (e.g. 'http://svc:3000/users/123')
 // or a resolver function that returns such a URL string.
 type ServiceDef = string | ((path: string, req: NextRequest) => string | Promise<string>)
