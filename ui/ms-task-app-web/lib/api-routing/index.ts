@@ -14,6 +14,7 @@ export type MatchedRoute = {
   routeName?: string
 }
 
+// NOTE: Order matters because first match wins!
 const apiRouteTable: RouteEntry[] = [
   {
     name: 'task-service',
@@ -32,13 +33,13 @@ const apiRouteTable: RouteEntry[] = [
     },
   },
   {
-    name: 'user-service',
+    name: 'oauth-service',
     // matches: /users or /users/:id
-    matcher: /^\/users(?:\/|$)/,
+    matcher: /^\/(?:users|providers|sessions|verification-tokens)(?:\/|$)/,
     service: (path: string) => {
       const base = buildBaseFromHostPort(
-        process.env.USER_SVC_HOST ?? 'user-service',
-        Number(process.env.USER_SVC_PORT ?? 3001)
+        process.env.OAUTH_SVC_HOST ?? 'oauth-service',
+        Number(process.env.OAUTH_SVC_PORT ?? 3001)
       )
       return `${base}${path}`
     },

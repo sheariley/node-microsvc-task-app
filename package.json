@@ -10,11 +10,11 @@
     "build:service-util": "npm run build --workspace=packages/ms-task-app-service-util",
     "build:dto": "npm run build --workspace=packages/ms-task-app-dto",
     "build:entities": "npm run build --workspace=packages/ms-task-app-entities",
-    "build:user-service": "npm run build --workspace=services/user-service",
+    "build:oauth-service": "npm run build --workspace=services/oauth-service",
     "build:task-service": "npm run build --workspace=services/task-service",
     "build:notification-service": "npm run build --workspace=services/notification-service",
     "build:web": "npm run build --workspace=ui/ms-task-app-web",
-    "start:user-service": "npm run dev --workspace=services/user-service",
+    "start:oauth-service": "npm run dev --workspace=services/oauth-service",
     "start:task-service": "npm run dev --workspace=services/task-service",
     "start:notification-service": "npm run dev --workspace=services/notification-service",
     "start:web": "npm run dev --workspace=ui/ms-task-app-web"
@@ -25,6 +25,7 @@
     "/services/*"
   ],
   "dependencies": {
+    "@auth/core": "0.41.1",
     "body-parser": "^2.2.1",
     "express": "^5.2.1",
     "mongoose": "^9.0.1",

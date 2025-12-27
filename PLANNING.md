@@ -31,7 +31,7 @@ Build a task management app composed of containerized micro-services that allows
 
 ## User Service
 
-- Workspace source location: ./user-service
+- Workspace source location: ./oauth-service
 - Stack
   - Express + Mongoose: Users Web API server
   - MongoDB: Users database
@@ -70,7 +70,7 @@ Build a task management app composed of containerized micro-services that allows
 - Source code paths
   - `@/public` - Static files to be copied to server upon deployment
   - `@/lib` - Low-level, shared utility methods and types
-  - `@/lib/api-clients` - Web API clients that facilitate the interface between the web UI and the various services (i.e. user-service, task-service, etc...)
+  - `@/lib/api-clients` - Web API clients that facilitate the interface between the web UI and the various services (i.e. oauth-service, task-service, etc...)
   - `@/app/components` - Custom UI components
   - `@/app/styles` - Custom CSS files, if any
   - `@/app/globals.css` - Root CSS file; defines Tailwind CSS variables and theme; imports any custom CSS files from `@/app/styles`

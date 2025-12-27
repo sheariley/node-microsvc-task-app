@@ -1,5 +1,5 @@
 {
-  "name": "user-service",
+  "name": "oauth-service",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -11,13 +11,17 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@auth/core": "0.41.1",
+    "@auth/mongodb-adapter": "^3.11.1",
     "body-parser": "^2.2.1",
     "express": "^5.2.1",
+    "mongodb": "^6.21.0",
     "mongoose": "^9.0.1",
     "ms-task-app-common": "0.0.0",
     "ms-task-app-dto": "0.0.0",
     "ms-task-app-entities": "0.0.0",
-    "ms-task-app-service-util": "0.0.0"
+    "ms-task-app-service-util": "0.0.0",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

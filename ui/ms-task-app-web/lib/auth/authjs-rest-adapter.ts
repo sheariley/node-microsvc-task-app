@@ -4,8 +4,6 @@ export type RestAdapterOptions = {
   baseUrl: string
 }
 
-// TODO: Add some form of service-to-service authentication
-
 export function RestAdapter({ baseUrl }: RestAdapterOptions): Adapter {
   return {
     async createUser(data) {
@@ -181,9 +179,9 @@ export function RestAdapter({ baseUrl }: RestAdapterOptions): Adapter {
       return result
     },
     async updateSession(session) {
-      const { sessionToken, ...data } = session
+      const { sessionToken } = session
       const url = `${baseUrl}/sessions/${sessionToken}`
-      const body = JSON.stringify(data)
+      const body = JSON.stringify(session)
       const res = await fetch(url, {
         method: 'PUT',
         headers: {

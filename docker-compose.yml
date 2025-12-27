@@ -44,17 +44,17 @@ services:
       ]
     restart: unless-stopped
 
-  user-service:
+  oauth-service:
     environment:
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
     build:
       context: ./
       dockerfile: ./Dockerfile
-      target: runtime_user_service
-    container_name: user-service
+      target: runtime_oauth_service
+    container_name: oauth-service
     ports:
-      - "${USER_SVC_PORT}:3001"
+      - "${OAUTH_SVC_PORT}:3001"
     depends_on:
       - mongo
     restart: unless-stopped
@@ -106,7 +106,7 @@ services:
   web-ui:
     environment:
       - WEB_UI_PORT=${WEB_UI_PORT}
-      - USER_SVC_PORT=${USER_SVC_PORT}
+      - OAUTH_SVC_PORT=${OAUTH_SVC_PORT}
       - TASK_SVC_PORT=${TASK_SVC_PORT}
       - AUTH_TRUST_HOST=true
       - AUTH_URL=${AUTH_URL}
@@ -121,7 +121,7 @@ services:
     ports:
       - "${WEB_UI_PORT}:3000"
     depends_on:
-      - user-service
+      - oauth-service
       - task-service
     restart: unless-stopped
 

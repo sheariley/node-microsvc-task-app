@@ -84,10 +84,10 @@ COPY --from=build_base /repo/package*.json ./
 
 
 # ===============================
-# User Service stage(s)
+# OAuth Service stage(s)
 # ===============================
-FROM build_base AS build_user_service
-ARG SVC_NAME=user-service
+FROM build_base AS build_oauth_service
+ARG SVC_NAME=oauth-service
 WORKDIR /repo
 
 # Copy service source code
@@ -99,21 +99,21 @@ RUN npm install --no-audit --no-fund
 # Build the service workspace
 RUN npm run build --workspace=services/${SVC_NAME}
 
-FROM runtime_base AS runtime_user_service
-ARG SVC_NAME=user-service USER_SVC_PORT=3001
+FROM runtime_base AS runtime_oauth_service
+ARG SVC_NAME=oauth-service OAUTH_SVC_PORT=3001
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
 # Copy build artifacts
-COPY --from=build_user_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
+COPY --from=build_oauth_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
 
 # Copy package*.json files for npm ci
-COPY --from=build_user_service /repo/services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
+COPY --from=build_oauth_service /repo/services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install runtime pkg depends
 RUN npm ci --no-audit --no-fund
 
-EXPOSE ${USER_SVC_PORT}
+EXPOSE ${OAUTH_SVC_PORT}
 
 # Run server
 CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
@@ -208,7 +208,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build --workspace=ui/ms-task-app-web
 
 FROM runtime_base AS runtime_web_ui
-ARG WEB_UI_PORT=3000 USER_SVC_PORT=3001 TASK_SVC_PORT=3002
+ARG WEB_UI_PORT=3000 OAUTH_SVC_PORT=3001 TASK_SVC_PORT=3002
 ENV NODE_ENV=production
 WORKDIR /app
 

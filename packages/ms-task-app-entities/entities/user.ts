@@ -12,13 +12,13 @@ export const UserEntitySchema = z.object({
 export type UserEntity = z.infer<typeof UserEntitySchema>
 
 export const UserDbSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-  },
   email: {
     type: String,
     required: true,
+  },
+  emailVerified: {
+    type: Date,
+    required: false,
   },
 })
 
