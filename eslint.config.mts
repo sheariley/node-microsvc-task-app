@@ -14,6 +14,7 @@ export default defineConfig([
     extends: ['js/recommended', '@typescript-eslint/recommended'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: {
+      'no-unused-var': 'warn',
       quotes: ['warn', 'single'],
       semi: ['warn', 'never'],
     },

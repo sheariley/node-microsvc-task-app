@@ -3,6 +3,7 @@ import { UserModel } from 'ms-task-app-entities'
 import {
   connectMongoDbWithRetry,
   connectMQWithRetry,
+  type AccountLinkedQueueMessage,
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
@@ -15,6 +16,8 @@ const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
 const rabbitMQPort = Number(process.env.RABBITMQ_PORT ?? 5672)
 const rabbitMQTaskCreatedQueueName = process.env.RABBITMQ_TASK_CREATED_QUEUE_NAME ?? 'task_created'
 const rabbitMQTaskUpdatedQueueName = process.env.RABBITMQ_TASK_UPDATED_QUEUE_NAME ?? 'task_updated'
+const rabbitMQAccountLinkedQueueName =
+  process.env.RABBITMQ_ACCOUNT_LINKED_QUEUE_NAME ?? 'account_linked'
 
 const smtpHost = process.env.SMTP_HOST ?? 'smtp-server'
 const smtpPort = Number(process.env.SMTP_PORT ?? 1025)
@@ -55,7 +58,8 @@ async function main() {
   const { connection: userDbCon, error: userDbConError } = (await connectMongoDbWithRetry({
     host: mongoHost,
     port: mongoPort,
-    dbName: 'users',
+    dbName: 'oauth',
+    appName: 'notification-service'
   }))!
 
   if (userDbConError || !userDbCon) {
@@ -67,20 +71,20 @@ async function main() {
   mqChannel.consume(rabbitMQTaskCreatedQueueName, async msg => {
     if (msg) {
       try {
-        const taskData: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
-        console.log('Notification: TASK CREATED: ', taskData)
+        const payload: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
+        console.log('Notification: TASK CREATED: ', payload)
 
-        const user = await UserModel.findOne().where('_id').equals(taskData.userId)
+        const user = await UserModel.findOne().where('_id').equals(payload.userId)
 
         if (!user) {
           throw new Error(
-            `User with ID ${taskData.userId} associated with task notification not found.`
+            `User with ID ${payload.userId} associated with task notification not found.`
           )
         }
 
         if (!user.email) {
           console.warn(
-            `User with ID ${taskData.userId} associated with task notification has no email address.`
+            `User with ID ${payload.userId} associated with task notification has no email address.`
           )
           mqChannel.nack(msg)
           return
@@ -90,12 +94,12 @@ async function main() {
           from: notifyFromEmail,
           to: user.email,
           subject: 'A new task was created',
-          text: `A new task was created for you! The title was "${taskData.title}".`,
+          text: `A new task was created for you! The title was "${payload.title}".`,
         })
 
         if (mailResult.messageId) {
           console.log(
-            `Task creation email notification sent. TaskId: ${taskData.taskId}, MessageId: ${mailResult.messageId}`
+            `Task creation email notification sent. TaskId: ${payload.taskId}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
           )
           mqChannel.ack(msg)
         }
@@ -109,20 +113,20 @@ async function main() {
   mqChannel.consume(rabbitMQTaskUpdatedQueueName, async msg => {
     if (msg) {
       try {
-        const taskData: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
-        console.log('Notification: TASK UPDATED: ', taskData)
+        const payload: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
+        console.log('Notification: TASK UPDATED: ', payload)
 
-        const user = await UserModel.findOne().where('_id').equals(taskData.userId)
+        const user = await UserModel.findOne().where('_id').equals(payload.userId)
 
         if (!user) {
           throw new Error(
-            `User with ID ${taskData.userId} associated with task notification not found.`
+            `User with ID ${payload.userId} associated with task notification not found.`
           )
         }
 
         if (!user.email) {
           console.warn(
-            `User with ID ${taskData.userId} associated with task notification has no email address.`
+            `User with ID ${payload.userId} associated with task notification has no email address.`
           )
           mqChannel.nack(msg)
           return
@@ -132,12 +136,54 @@ async function main() {
           from: notifyFromEmail,
           to: user.email,
           subject: 'A task was updated',
-          text: `The task titled "${taskData.title}" was updated. Completed: ${taskData.completed}`,
+          text: `The task titled "${payload.title}" was updated. Completed: ${payload.completed}`,
         })
 
         if (mailResult.messageId) {
           console.log(
-            `Task update email notification sent. TaskId: ${taskData.taskId}, MessageId: ${mailResult.messageId}`
+            `Task update email notification sent. TaskId: ${payload.taskId}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
+          )
+          mqChannel.ack(msg)
+        }
+      } catch (error) {
+        const msg = coalesceErrorMsg(error)
+        console.error('Error sending notification email: ', msg)
+      }
+    }
+  })
+
+  mqChannel.consume(rabbitMQAccountLinkedQueueName, async msg => {
+    if (msg) {
+      try {
+        const payload: AccountLinkedQueueMessage = JSON.parse(msg.content.toString())
+        console.log('Notification: ACCOUNT LINKED: ', payload)
+
+        const user = await UserModel.findOne().where('_id').equals(payload.userId)
+
+        if (!user) {
+          throw new Error(
+            `User with ID ${payload.userId} associated with account notification not found.`
+          )
+        }
+
+        if (!user.email) {
+          console.warn(
+            `User with ID ${payload.userId} associated with account notification has no email address.`
+          )
+          mqChannel.nack(msg)
+          return
+        }
+
+        const mailResult = await mailTransport.sendMail({
+          from: notifyFromEmail,
+          to: user.email,
+          subject: 'An account of yours was linked',
+          text: `Your ${payload.provider} account was linked.`,
+        })
+
+        if (mailResult.messageId) {
+          console.log(
+            `Account link email notification sent. Provider: ${payload.provider}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
           )
           mqChannel.ack(msg)
         }

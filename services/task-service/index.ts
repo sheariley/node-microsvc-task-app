@@ -45,6 +45,7 @@ async function main() {
     host: mongoHost,
     port: mongoPort,
     dbName: 'tasks',
+    appName: 'task-service'
   }))!
 
   if (taskDbConError || !taskDbCon) {

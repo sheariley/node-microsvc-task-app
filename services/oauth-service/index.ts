@@ -4,16 +4,32 @@ import express from 'express'
 import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 import mongoose from 'mongoose'
 import { coalesceErrorMsg } from 'ms-task-app-common'
-import { AccountInputDtoSchema, mapDtoValidationErrors, SessionInputDtoSchema, UserDtoSchema, VerificationTokenInputDtoSchema, type AccountInputDto, type SessionInputDto, type UserDto, type VerificationTokenInputDto } from 'ms-task-app-dto'
+import {
+  AccountInputDtoSchema,
+  mapDtoValidationErrors,
+  SessionInputDtoSchema,
+  UserDtoSchema,
+  VerificationTokenInputDtoSchema,
+  type AccountInputDto,
+  type SessionInputDto,
+  type UserDto,
+  type VerificationTokenInputDto,
+} from 'ms-task-app-dto'
+import { connectMQWithRetry, type AccountLinkedQueueMessage } from 'ms-task-app-service-util'
 import * as z from 'zod'
 
 const port = 3001
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
 const mongoHost = process.env.MONGODB_HOST || 'localhost'
+const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
+const rabbitMQPort = Number(process.env.RABBITMQ_PORT ?? 5672)
+const rabbitMQAccountLinkedQueueName =
+  process.env.RABBITMQ_ACCOUNT_LINKED_QUEUE_NAME ?? 'account_linked'
 
 function createMongoClient() {
   const uri = `mongodb://${mongoHost}:${mongoPort}/oauth`
   const options: MongoClientOptions = {
+    appName: 'oauth-service',
     serverApi: {
       version: ServerApiVersion.v1,
       strict: true,
@@ -28,6 +44,22 @@ async function main() {
   const app = express()
   app.use(bodyParser.json())
 
+  const {
+    mqConnection,
+    mqChannel,
+    error: mqError,
+  } = (await connectMQWithRetry({
+    host: rabbitMQHost,
+    port: rabbitMQPort,
+  }))!
+
+  if (mqError || !mqConnection || !mqChannel) {
+    process.exit(1)
+  }
+
+  console.log('Asserting message queues...')
+  await mqChannel.assertQueue(rabbitMQAccountLinkedQueueName)
+
   const client = createMongoClient()
   const mongoAuthAdapter = MongoDBAdapter(client)
 
@@ -38,7 +70,7 @@ async function main() {
 
   app.get('/users/by-email/:email', async (req, res) => {
     try {
-      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)      
+      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!z.email().safeParse(req.params.email).success) {
         return res.status(404)
       }
@@ -80,16 +112,20 @@ async function main() {
 
   app.get('/providers/:provider/accounts/:providerAccountId/user', async (req, res) => {
     try {
-      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)      
+      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!req.params.provider || !req.params.providerAccountId) {
         return res.status(404)
       }
       const { provider, providerAccountId } = req.params
 
-      const result = await mongoAuthAdapter.getUserByAccount!({provider, providerAccountId})
+      const result = await mongoAuthAdapter.getUserByAccount!({ provider, providerAccountId })
 
       if (!result) {
-        res.status(404).json({ error: `User with provider account "${provider}, ${providerAccountId}" not found` })
+        res
+          .status(404)
+          .json({
+            error: `User with provider account "${provider}, ${providerAccountId}" not found`,
+          })
       } else {
         res.json(result)
       }
@@ -181,9 +217,19 @@ async function main() {
 
     try {
       const result = await mongoAuthAdapter.linkAccount!(inputDto)
-
-      // TODO: Send notification via MQ
-
+      const accountLinkedMsg: AccountLinkedQueueMessage = {
+        provider: inputDto.provider,
+        userId: inputDto.userId,
+        scope: inputDto.scope
+      }
+      try {
+        mqChannel.sendToQueue(
+          rabbitMQAccountLinkedQueueName,
+          Buffer.from(JSON.stringify(accountLinkedMsg))
+        )
+      } catch (mqSendErr) {
+        console.warn('Error sending account_linked message to queue', mqSendErr, accountLinkedMsg)
+      }
       res.status(201).json(result)
     } catch (error) {
       console.error('Error linking provider account: ', error)
@@ -194,16 +240,18 @@ async function main() {
 
   app.delete('/providers/:provider/accounts/:providerAccountId/unlink', async (req, res) => {
     try {
-      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)      
+      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!req.params.provider || !req.params.providerAccountId) {
         return res.status(404)
       }
       const { provider, providerAccountId } = req.params
 
-      const result = await mongoAuthAdapter.unlinkAccount!({provider, providerAccountId})
+      const result = await mongoAuthAdapter.unlinkAccount!({ provider, providerAccountId })
 
       if (!result) {
-        res.status(404).json({ error: `Provider account "${provider}, ${providerAccountId}" not found` })
+        res
+          .status(404)
+          .json({ error: `Provider account "${provider}, ${providerAccountId}" not found` })
       } else {
         res.json(result)
       }
@@ -354,7 +402,7 @@ async function main() {
 
       const { identifier, token } = req.params
 
-      const result = await mongoAuthAdapter.useVerificationToken!({identifier, token})
+      const result = await mongoAuthAdapter.useVerificationToken!({ identifier, token })
 
       if (!result) {
         res.status(404).json({ error: `Verification token "${identifier}/${token}" not found` })
@@ -367,7 +415,7 @@ async function main() {
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })
-  
+
   app.listen(port, () => {
     console.log(`User service listening on port ${port}`)
   })

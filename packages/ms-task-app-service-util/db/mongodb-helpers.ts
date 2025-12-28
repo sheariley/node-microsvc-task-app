@@ -7,12 +7,14 @@ export type MongoDbConnectOptions = {
   dbName: string
   retries?: number
   delay?: number
+  appName: string
 }
 
 export async function connectMongoDbWithRetry({
   host,
   port,
   dbName,
+  appName,
   retries = 5,
   delay = 3000,
 }: MongoDbConnectOptions) {
@@ -25,7 +27,7 @@ export async function connectMongoDbWithRetry({
     await wait(delay)
     try {
       console.log(`Connecting to MongoDB at ${uri}...`)
-      const connection = await mongoose.connect(uri)
+      const connection = await mongoose.connect(uri, { appName })
       console.log('Connected to MongoDB')
       return { connection, error: null }
     } catch (error) {
