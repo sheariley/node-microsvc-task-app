@@ -5,7 +5,7 @@ import { ObjectIdStringSchema } from './common.js'
 export const SessionInputDtoSchema = z.object({
   sessionToken: z.uuidv4(),
   userId: ObjectIdStringSchema,
-  expires: z.date()
+  expires: z.coerce.date()
 })
 
 export const SessionDtoSchema = z.object({

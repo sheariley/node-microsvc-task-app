@@ -2,12 +2,12 @@ name: micro-service-task-app
 
 services:
   mongo:
+    volumes:
+      - mongo_data:/data/db
     image: mongodb/mongodb-community-server:8.0-ubi8
     container_name: mongo
     ports:
       - "${MONGODB_PORT}:27017"
-    volumes:
-      - mongo_data:/data/db
     restart: unless-stopped
 
   rabbitmq:
@@ -24,14 +24,14 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
       - MAILDEV_WEB_PORT=${MAILDEV_WEB_PORT}
+    volumes:
+      - mail_data:/maildata
     image: maildev/maildev:latest
     container_name: smtp-server
     user: root
     ports:
       - "${MAILDEV_WEB_PORT}:1080" # Web UI
       - "${SMTP_PORT}:1025" # SMTP server
-    volumes:
-      - mail_data:/maildata
     command:
       [
         "maildev",
@@ -46,8 +46,11 @@ services:
 
   oauth-service:
     environment:
+      - NPM_CONFIG_CACHE=/data/.npm-cache
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
+    volumes:
+      - npm_cache:/data/.npm-cache
     build:
       context: ./
       dockerfile: ./Dockerfile
@@ -61,12 +64,15 @@ services:
 
   task-service:
     environment:
+      - NPM_CONFIG_CACHE=/data/.npm-cache
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
       - RABBITMQ_HOST=${RABBITMQ_HOST}
       - RABBITMQ_PORT=${RABBITMQ_PORT}
       - RABBITMQ_TASK_CREATED_QUEUE_NAME=${RABBITMQ_TASK_CREATED_QUEUE_NAME}
       - RABBITMQ_TASK_UPDATED_QUEUE_NAME=${RABBITMQ_TASK_UPDATED_QUEUE_NAME}
+    volumes:
+      - npm_cache:/data/.npm-cache
     build:
       context: ./
       dockerfile: ./Dockerfile
@@ -81,6 +87,7 @@ services:
 
   notification-service:
     environment:
+      - NPM_CONFIG_CACHE=/data/.npm-cache
       - NOTIFY_FROM_EMAIL=noreply@notification-service.local
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
@@ -92,6 +99,8 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
+    volumes:
+      - npm_cache:/data/.npm-cache
     build:
       context: ./
       dockerfile: ./Dockerfile
@@ -105,6 +114,7 @@ services:
 
   web-ui:
     environment:
+      - NPM_CONFIG_CACHE=/data/.npm-cache
       - WEB_UI_PORT=${WEB_UI_PORT}
       - OAUTH_SVC_PORT=${OAUTH_SVC_PORT}
       - TASK_SVC_PORT=${TASK_SVC_PORT}
@@ -113,6 +123,8 @@ services:
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
       - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
+    volumes:
+      - npm_cache:/data/.npm-cache
     build:
       context: ./
       dockerfile: ./Dockerfile
@@ -128,3 +140,4 @@ services:
 volumes:
   mongo_data:
   mail_data:
+  npm_cache:

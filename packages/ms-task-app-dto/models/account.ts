@@ -18,17 +18,17 @@ export const AccountTypeSchema = z.literal(['oauth', 'oidc', 'email', 'webauthn'
 
 export const AccountInputDtoSchema = z.object({
   access_token: z.string(),
-  expires_in: z.number(),
-  id_token: z.string(),
-  refresh_token: z.string(),
+  expires_in: z.number().optional(),
+  id_token: z.string().optional(),
+  refresh_token: z.string().optional(),
   scope: z.string(),
-  authorization_details: z.array(AuthorizationDetailsSchema),
+  authorization_details: z.array(AuthorizationDetailsSchema).optional(),
   token_type: z.literal(['bearer', 'dpop']),
   provider: z.string(),
   providerAccountId: z.string(),
   type: AccountTypeSchema,
   userId: ObjectIdStringSchema,
-  expires_at: z.number()
+  expires_at: z.number().optional()
 }).catchall(z.json())
 
 export const AccountDtoSchema = z.object({

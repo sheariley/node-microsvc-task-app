@@ -1,3 +1,4 @@
+import type { AdapterAccount } from '@auth/core/adapters'
 import { MongoDBAdapter } from '@auth/mongodb-adapter'
 import bodyParser from 'body-parser'
 import express from 'express'
@@ -121,11 +122,9 @@ async function main() {
       const result = await mongoAuthAdapter.getUserByAccount!({ provider, providerAccountId })
 
       if (!result) {
-        res
-          .status(404)
-          .json({
-            error: `User with provider account "${provider}, ${providerAccountId}" not found`,
-          })
+        res.status(404).json({
+          error: `User with provider account "${provider}, ${providerAccountId}" not found`,
+        })
       } else {
         res.json(result)
       }
@@ -142,8 +141,10 @@ async function main() {
     const valResult = await UserDtoSchema.safeParseAsync(inputDto)
 
     if (!valResult.success) {
+      const validationErrors = mapDtoValidationErrors(valResult.error)
+      console.warn('Create user input validation failed', validationErrors, inputDto)
       return res.status(400).json({
-        errors: mapDtoValidationErrors(valResult.error),
+        errors: validationErrors,
       })
     }
 
@@ -205,13 +206,22 @@ async function main() {
   })
 
   app.post('/providers/:provider/accounts/link', async (req, res) => {
-    const inputDto = req.body as AccountInputDto
+    const inputDto = {
+      ...req.body,
+      provider: req.params.provider,
+    } as AccountInputDto
 
     const valResult = await AccountInputDtoSchema.safeParseAsync(inputDto)
 
     if (!valResult.success) {
+      const validationErrors = mapDtoValidationErrors(valResult.error)
+      console.warn('Link account input validation failed', {
+        url: req.url,
+        validationErrors,
+        inputDto,
+      })
       return res.status(400).json({
-        errors: mapDtoValidationErrors(valResult.error),
+        errors: validationErrors,
       })
     }
 
@@ -220,7 +230,7 @@ async function main() {
       const accountLinkedMsg: AccountLinkedQueueMessage = {
         provider: inputDto.provider,
         userId: inputDto.userId,
-        scope: inputDto.scope
+        scope: inputDto.scope,
       }
       try {
         mqChannel.sendToQueue(
@@ -266,6 +276,7 @@ async function main() {
     try {
       // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!z.uuidv4().safeParse(req.params.sessionToken).success) {
+        console.warn('Get session and user param validation failed', { url: req.url, params: req.params })
         return res.status(404)
       }
 
@@ -285,17 +296,22 @@ async function main() {
 
   app.post('/sessions', async (req, res) => {
     const inputDto = req.body as SessionInputDto
-
     const valResult = await SessionInputDtoSchema.safeParseAsync(inputDto)
 
     if (!valResult.success) {
+      const validationErrors = mapDtoValidationErrors(valResult.error)
+      console.warn('Create session input validation failed', {
+        url: req.url,
+        validationErrors,
+        inputDto,
+      })
       return res.status(400).json({
-        errors: mapDtoValidationErrors(valResult.error),
+        errors: validationErrors,
       })
     }
 
     try {
-      const result = await mongoAuthAdapter.createSession!(inputDto)
+      const result = await mongoAuthAdapter.createSession!(valResult.data)
       res.status(201).json(result)
     } catch (error) {
       console.error('Error creating session: ', error)
@@ -306,7 +322,6 @@ async function main() {
 
   app.put('/sessions/:sessionToken', async (req, res) => {
     const inputDto = req.body as SessionInputDto
-
     const valResult = await SessionInputDtoSchema.safeParseAsync(inputDto)
 
     if (!valResult.success) {
@@ -417,7 +432,7 @@ async function main() {
   })
 
   app.listen(port, () => {
-    console.log(`User service listening on port ${port}`)
+    console.log(`OAuth service listening on port ${port}`)
   })
 }
 

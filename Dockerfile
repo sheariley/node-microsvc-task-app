@@ -86,15 +86,22 @@ COPY --from=build_base /repo/package*.json ./
 # ===============================
 # OAuth Service stage(s)
 # ===============================
-FROM build_base AS build_oauth_service
+FROM build_base AS build_oauth_service_deps
 ARG SVC_NAME=oauth-service
 WORKDIR /repo
 
 # Copy service source code
-COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
+COPY ./services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install dependencies
 RUN npm install --no-audit --no-fund
+
+FROM build_oauth_service_deps AS build_oauth_service
+ARG SVC_NAME=oauth-service
+WORKDIR /repo
+
+# Copy workspace source code
+COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 
 # Build the service workspace
 RUN npm run build --workspace=services/${SVC_NAME}
@@ -122,16 +129,23 @@ CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
 # ===============================
 # Task Service stage(s)
 # ===============================
-FROM build_base AS build_task_service
+FROM build_base AS build_task_service_deps
 ARG SVC_NAME=task-service
 
 WORKDIR /repo
 
-# Copy service source code
-COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
+# Copy workspace package.json
+COPY ./services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install dependencies
 RUN npm install --no-audit --no-fund
+
+FROM build_task_service_deps AS build_task_service
+ARG SVC_NAME=task-service
+WORKDIR /repo
+
+# Copy workspace source code
+COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 
 # Build the service workspace
 RUN npm run build --workspace=services/${SVC_NAME}
@@ -159,15 +173,22 @@ CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
 # ===============================
 # Notification Service stage(s)
 # ===============================
-FROM build_base AS build_notification_service
+FROM build_base AS build_notification_service_deps
 ARG SVC_NAME=notification-service
 WORKDIR /repo
 
-# Copy service source code
-COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
+# Copy workspace package.json
+COPY ./services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install dependencies
 RUN npm install --no-audit --no-fund
+
+FROM build_notification_service_deps AS build_notification_service
+ARG SVC_NAME=notification-service
+WORKDIR /repo
+
+# Copy workspace source code
+COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 
 # Build the service workspace
 RUN npm run build --workspace=services/${SVC_NAME}
@@ -193,14 +214,20 @@ CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
 # ===============================
 # Web UI stage(s)
 # ===============================
-FROM build_base AS build_web_ui
+FROM build_base AS build_web_ui_deps
 WORKDIR /repo
 
-COPY ./ui/ms-task-app-web ./ui/ms-task-app-web/
+# Copy workspace package.json
+COPY ./ui/ms-task-app-web/package.json ./ui/ms-task-app-web/
 
 # Install dependencies
 RUN npm install --no-audit --no-fund
 RUN npm install --no-audit --no-fund --save-dev --workspace=ui/ms-task-app-web lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl
+
+FROM build_web_ui_deps AS build_web_ui
+WORKDIR /repo
+
+COPY ./ui/ms-task-app-web ./ui/ms-task-app-web/
 
 ENV NEXT_TELEMETRY_DISABLED=1
 

@@ -1,8 +1,7 @@
 import * as z from 'zod'
-import { ObjectIdStringSchema } from './common.js'
 
 export const UserDtoSchema = z.object({
-  id: ObjectIdStringSchema,
+  id: z.uuidv4(),
   email: z.email('Must be a valid email address'),
   emailVerified: z.date().nullable()
 })

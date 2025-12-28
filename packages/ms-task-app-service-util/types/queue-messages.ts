@@ -11,6 +11,6 @@ export type TaskUpdatedQueueMessage = TaskCreatedQueueMessage & {
 
 export type AccountLinkedQueueMessage = {
   userId: string
-  provider: string
+  provider?: string
   scope: string
 }
