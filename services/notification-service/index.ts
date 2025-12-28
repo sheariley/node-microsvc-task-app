@@ -54,6 +54,7 @@ async function main() {
   console.log('Asserting message queues...')
   await mqChannel.assertQueue(rabbitMQTaskCreatedQueueName)
   await mqChannel.assertQueue(rabbitMQTaskUpdatedQueueName)
+  await mqChannel.assertQueue(rabbitMQAccountLinkedQueueName)
 
   const { connection: userDbCon, error: userDbConError } = (await connectMongoDbWithRetry({
     host: mongoHost,
