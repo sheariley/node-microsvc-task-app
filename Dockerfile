@@ -8,28 +8,23 @@ WORKDIR /repo
 # Copy root package*.json files
 COPY /package*.json ./
 
-# Copy common package source code
-COPY ./packages/ms-task-app-common ./packages/ms-task-app-common/
-# Copy root package-lock.json to package source dir
-COPY /package-lock.json ./packages/ms-task-app-common/
+# Copy common package.json file
+COPY ./packages/ms-task-app-common/package.json ./packages/ms-task-app-common/
 
-# Copy DTO package*.json files
+# Copy DTO package.json file
 COPY ./packages/ms-task-app-dto/package.json ./packages/ms-task-app-dto/
-# Copy root package-lock.json to package source dir
-COPY /package-lock.json ./packages/ms-task-app-dto/
 
-# Copy entities package*.json files
+# Copy entities package.json file
 COPY ./packages/ms-task-app-entities/package.json ./packages/ms-task-app-entities/
-# Copy root package-lock.json to package source dir
-COPY /package-lock.json ./packages/ms-task-app-entities/
 
-# Copy service-util package*.json files
+# Copy auth package.json file
+COPY ./packages/ms-task-app-auth/package.json ./packages/ms-task-app-auth/
+
+# Copy service-util package.json file
 COPY ./packages/ms-task-app-service-util/package.json ./packages/ms-task-app-service-util/
-# Copy root package-lock.json to package source dir
-COPY /package-lock.json ./packages/ms-task-app-service-util/
 
 # Install NPM deps
-RUN npm install --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 
 # ====================================================================
@@ -37,9 +32,6 @@ RUN npm install --no-audit --no-fund
 # ====================================================================
 FROM base AS build_base
 WORKDIR /repo
-
-# Copy root package*.json files
-COPY /package*.json ./
 
 # Copy root TypeScript config
 COPY ./tsconfig.json ./
@@ -53,20 +45,26 @@ COPY ./packages/ms-task-app-dto ./packages/ms-task-app-dto/
 # Copy entities package source code
 COPY ./packages/ms-task-app-entities ./packages/ms-task-app-entities/
 
+# Copy auth package source code
+COPY ./packages/ms-task-app-auth ./packages/ms-task-app-auth/
+
 # Copy service-util package source code
 COPY ./packages/ms-task-app-service-util ./packages/ms-task-app-service-util/
 
 # Build the common package
-RUN npm run build --workspace=packages/ms-task-app-common
+RUN npm run build:common
 
 # Build the DTO package 
-RUN npm run build --workspace=packages/ms-task-app-dto
+RUN npm run build:dto
 
 # Build the entities package 
-RUN npm run build --workspace=packages/ms-task-app-entities
+RUN npm run build:entities
+
+# Build the auth package
+RUN npm run build:auth
 
 # Build the service-util package 
-RUN npm run build --workspace=packages/ms-task-app-service-util
+RUN npm run build:service-util
 
 
 # ======================================================================
@@ -74,10 +72,12 @@ RUN npm run build --workspace=packages/ms-task-app-service-util
 # ======================================================================
 FROM node:24-alpine AS runtime_base
 WORKDIR /app
+
 # Copy build artifacts
 COPY --from=build_base /repo/packages/ms-task-app-common ./packages/ms-task-app-common
 COPY --from=build_base /repo/packages/ms-task-app-dto ./packages/ms-task-app-dto
 COPY --from=build_base /repo/packages/ms-task-app-entities ./packages/ms-task-app-entities
+COPY --from=build_base /repo/packages/ms-task-app-auth ./packages/ms-task-app-auth
 COPY --from=build_base /repo/packages/ms-task-app-service-util ./packages/ms-task-app-service-util
 
 COPY --from=build_base /repo/package*.json ./
@@ -94,7 +94,7 @@ WORKDIR /repo
 COPY ./services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install dependencies
-RUN npm install --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 FROM build_oauth_service_deps AS build_oauth_service
 ARG SVC_NAME=oauth-service
@@ -104,7 +104,7 @@ WORKDIR /repo
 COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 
 # Build the service workspace
-RUN npm run build --workspace=services/${SVC_NAME}
+RUN npm run build:${SVC_NAME}
 
 FROM runtime_base AS runtime_oauth_service
 ARG SVC_NAME=oauth-service OAUTH_SVC_PORT=3001
@@ -118,7 +118,7 @@ COPY --from=build_oauth_service /repo/services/${SVC_NAME}/dist ./services/${SVC
 COPY --from=build_oauth_service /repo/services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install runtime pkg depends
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 EXPOSE ${OAUTH_SVC_PORT}
 
@@ -138,7 +138,7 @@ WORKDIR /repo
 COPY ./services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install dependencies
-RUN npm install --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 FROM build_task_service_deps AS build_task_service
 ARG SVC_NAME=task-service
@@ -148,7 +148,7 @@ WORKDIR /repo
 COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 
 # Build the service workspace
-RUN npm run build --workspace=services/${SVC_NAME}
+RUN npm run build:${SVC_NAME}
 
 FROM runtime_base AS runtime_task_service
 ARG SVC_NAME=task-service TASK_SVC_PORT=3002
@@ -162,7 +162,7 @@ COPY --from=build_task_service /repo/services/${SVC_NAME}/dist ./services/${SVC_
 COPY --from=build_task_service /repo/services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install runtime pkg depends
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 EXPOSE ${TASK_SVC_PORT}
 
@@ -181,7 +181,7 @@ WORKDIR /repo
 COPY ./services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install dependencies
-RUN npm install --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 FROM build_notification_service_deps AS build_notification_service
 ARG SVC_NAME=notification-service
@@ -191,7 +191,7 @@ WORKDIR /repo
 COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 
 # Build the service workspace
-RUN npm run build --workspace=services/${SVC_NAME}
+RUN npm run build:${SVC_NAME}
 
 FROM runtime_base AS runtime_notification_service
 ARG SVC_NAME=notification-service
@@ -205,7 +205,7 @@ COPY --from=build_notification_service /repo/services/${SVC_NAME}/dist ./service
 COPY --from=build_notification_service /repo/services/${SVC_NAME}/package.json ./services/${SVC_NAME}/
 
 # Install runtime pkg depends
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 # Run server
 CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
@@ -221,8 +221,8 @@ WORKDIR /repo
 COPY ./ui/ms-task-app-web/package.json ./ui/ms-task-app-web/
 
 # Install dependencies
-RUN npm install --no-audit --no-fund
-RUN npm install --no-audit --no-fund --save-dev --workspace=ui/ms-task-app-web lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund --save-dev --workspace=ui/ms-task-app-web lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl
 
 FROM build_web_ui_deps AS build_web_ui
 WORKDIR /repo
@@ -232,7 +232,7 @@ COPY ./ui/ms-task-app-web ./ui/ms-task-app-web/
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the service workspace
-RUN npm run build --workspace=ui/ms-task-app-web
+RUN npm run build:web
 
 FROM runtime_base AS runtime_web_ui
 ARG WEB_UI_PORT=3000 OAUTH_SVC_PORT=3001 TASK_SVC_PORT=3002
@@ -248,7 +248,7 @@ COPY --from=build_web_ui /repo/package*.json ./
 
 COPY --from=build_web_ui /repo/ui/ms-task-app-web/package.json ./ui/ms-task-app-web/
 
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing

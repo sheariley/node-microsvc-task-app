@@ -1,10 +1,8 @@
-import NextAuth from 'next-auth'
-import GitHub from 'next-auth/providers/github'
-import { RestAdapter } from './lib/auth/authjs-rest-adapter'
+import NextAuth, { type NextAuthConfig } from 'next-auth'
+import { getAuthConfig } from 'ms-task-app-auth'
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: RestAdapter({
-    baseUrl: `http://${process.env.OAUTH_SVC_HOST}:${process.env.OAUTH_SVC_PORT}`,
-  }),
-  providers: [GitHub],
-})
+const authServiceHost = process.env.OAUTH_SVC_HOST ?? 'oauth-service'
+const authServicePort = Number(process.env.OAUTH_SVC_PORT ?? 3001)
+const authServiceUrl = `http://${authServiceHost}:${authServicePort}`
+
+export const { handlers, signIn, signOut, auth } = NextAuth(getAuthConfig(authServiceUrl) as NextAuthConfig)

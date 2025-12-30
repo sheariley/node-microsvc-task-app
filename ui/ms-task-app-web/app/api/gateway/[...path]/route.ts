@@ -14,9 +14,9 @@ const HOP_BY_HOP = new Set([
   'upgrade',
 ])
 
-const proxyRequest = auth(async (req) => {
+const proxyRequest = auth(async req => {
   if (!req.auth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: true, message: 'Unauthorized' }, { status: 401 })
   }
 
   const urlObj = new URL(req.url)
@@ -31,10 +31,9 @@ const proxyRequest = auth(async (req) => {
     console.info('API gateway route matched', { from: forwardPath || '/', to: resolved.target })
     targetBase = resolved.target
   } catch (err) {
-    if (err instanceof HttpError)
-      return NextResponse.json({ error: err.message }, { status: err.status })
     const message = coalesceErrorMsg(err, 'Internal gateway routing error')
-    return NextResponse.json({ error: message }, { status: 500 })
+    const status = err instanceof HttpError ? err.status : 500
+    return NextResponse.json({ error: true, message }, { status })
   }
 
   const targetUri = `${targetBase}${urlObj.search}`

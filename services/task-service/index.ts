@@ -10,6 +10,7 @@ import {
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
+import { authenticatedUser } from './lib/authenticated-user.ts'
 
 const port = 3002
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
@@ -22,6 +23,7 @@ const rabbitMQTaskUpdatedQueueName = process.env.RABBITMQ_TASK_UPDATED_QUEUE_NAM
 
 async function main() {
   const app = express()
+  app.set('trust proxy', true)
   app.use(bodyParser.json())
 
   const {
@@ -45,7 +47,7 @@ async function main() {
     host: mongoHost,
     port: mongoPort,
     dbName: 'tasks',
-    appName: 'task-service'
+    appName: 'task-service',
   }))!
 
   if (taskDbConError || !taskDbCon) {
@@ -57,27 +59,37 @@ async function main() {
     res.status(200).json({ timestamp: Date.now() })
   })
 
-  app.get('/users/:userId/tasks', async (req, res) => {
+  // Get User's Tasks
+  app.get('/users/:userId/tasks', authenticatedUser, async (req, res) => {
     try {
       // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!mongoose.isValidObjectId(req.params.userId)) {
-        return res.status(404)
+        return res.status(404).json({ error: true, message: 'Not Found' })
+      }
+
+      if (req.params.userId !== res.locals.user?.id) {
+        return res.status(403).json({ error: true, message: 'Unauthorized' })
       }
 
       const tasks = await TaskModel.find().where('userId').equals(req.params.userId)
-      res.json(tasks)
+      res.status(200).json(tasks)
     } catch (error) {
       const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
   })
 
-  app.get('/users/:userId/tasks/:taskId', async (req, res) => {
+  // Get a specific user's task by ID
+  app.get('/users/:userId/tasks/:taskId', authenticatedUser, async (req, res) => {
     const { userId, taskId } = req.params
     try {
       // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
         return res.status(404)
+      }
+
+      if (req.params.userId !== res.locals.user?.id) {
+        return res.status(403).json({ error: true, message: 'Unauthorized' })
       }
 
       const task = await TaskModel.findById(req.params.taskId)
@@ -94,12 +106,17 @@ async function main() {
     }
   })
 
-  app.post('/users/:userId/tasks', async (req, res) => {
+  // Create a task for a user
+  app.post('/users/:userId/tasks', authenticatedUser, async (req, res) => {
     const { userId } = req.params
 
     // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
     if (!mongoose.isValidObjectId(req.params.userId)) {
       return res.status(404)
+    }
+
+    if (req.params.userId !== res.locals.user?.id) {
+      return res.status(403).json({ error: true, message: 'Unauthorized' })
     }
 
     const inputDto = req.body as TaskInputDto
@@ -122,7 +139,7 @@ async function main() {
       } else {
         const taskCreatedMsg: TaskCreatedQueueMessage = {
           taskId: task._id.toString(),
-          userId,
+          userId: userId!,
           title,
         }
         mqChannel.sendToQueue(
@@ -139,12 +156,17 @@ async function main() {
     }
   })
 
-  app.put('/users/:userId/tasks/:taskId', async (req, res) => {
+  // Update a task for a user
+  app.put('/users/:userId/tasks/:taskId', authenticatedUser, async (req, res) => {
     const { taskId, userId } = req.params
 
     // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
     if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
       return res.status(404)
+    }
+
+    if (req.params.userId !== res.locals.user?.id) {
+      return res.status(403).json({ error: true, message: 'Unauthorized' })
     }
 
     const inputDto = req.body as Partial<TaskInputDto>
@@ -176,7 +198,7 @@ async function main() {
       } else {
         const taskUpdatedMsg: TaskUpdatedQueueMessage = {
           taskId: task._id.toString(),
-          userId,
+          userId: userId!,
           title: task.title,
           description: task.description,
           completed: task.completed,
@@ -196,12 +218,17 @@ async function main() {
     }
   })
 
-  app.delete('/users/:userId/tasks/:taskId', async (req, res) => {
+  // Delete a user's task
+  app.delete('/users/:userId/tasks/:taskId', authenticatedUser, async (req, res) => {
     const { taskId, userId } = req.params
 
     // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
     if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
       return res.status(404)
+    }
+
+    if (req.params.userId !== res.locals.user?.id) {
+      return res.status(403).json({ error: true, message: 'Unauthorized' })
     }
 
     const task = await TaskModel.findByIdAndDelete(taskId).where('userId').equals(userId)

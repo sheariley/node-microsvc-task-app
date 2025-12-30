@@ -11,6 +11,11 @@
     "target": "esnext",
     "types": ["node"],
     "lib": ["esnext"],
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "typeRoots": ["@types", "./node_modules/@types"],
 
     // Other Outputs
     "sourceMap": true,
@@ -38,5 +43,11 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "references": [{ "path": "./packages/ms-task-app-service-util" }]
+  "references": [
+    { "path": "./packages/ms-task-app-auth" },
+    { "path": "./packages/ms-task-app-common" },
+    { "path": "./packages/ms-task-app-dto" },
+    { "path": "./packages/ms-task-app-entities" },
+    { "path": "./packages/ms-task-app-service-util" }
+  ]
 }

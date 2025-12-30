@@ -2,23 +2,24 @@ name: micro-service-task-app
 
 services:
   mongo:
+    container_name: mongo
     volumes:
       - mongo_data:/data/db
     image: mongodb/mongodb-community-server:8.0-ubi8
-    container_name: mongo
     ports:
       - "${MONGODB_PORT}:27017"
     restart: unless-stopped
 
   rabbitmq:
-    image: rabbitmq:4.2-management-alpine
     container_name: rabbitmq
+    image: rabbitmq:4.2-management-alpine
     ports:
       - "${RABBITMQ_PORT}:5672"
       - "${RABBITMQ_WEB_PORT}:15672"
     restart: unless-stopped
 
   smtp-server:
+    container_name: smtp-server
     environment:
       - MAILDEV_SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
@@ -27,7 +28,6 @@ services:
     volumes:
       - mail_data:/maildata
     image: maildev/maildev:latest
-    container_name: smtp-server
     user: root
     ports:
       - "${MAILDEV_WEB_PORT}:1080" # Web UI
@@ -45,17 +45,17 @@ services:
     restart: unless-stopped
 
   oauth-service:
+    container_name: oauth-service
     environment:
-      - NPM_CONFIG_CACHE=/data/.npm-cache
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
-    volumes:
-      - npm_cache:/data/.npm-cache
+    labels:
+      - "buildkit.cache.to=type=local,dest=./npm-cache"
+      - "buildkit.cache.from=type=local,src=./npm-cache"
     build:
       context: ./
       dockerfile: ./Dockerfile
       target: runtime_oauth_service
-    container_name: oauth-service
     ports:
       - "${OAUTH_SVC_PORT}:3001"
     depends_on:
@@ -63,21 +63,26 @@ services:
     restart: unless-stopped
 
   task-service:
+    container_name: task-service
     environment:
-      - NPM_CONFIG_CACHE=/data/.npm-cache
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
       - RABBITMQ_HOST=${RABBITMQ_HOST}
       - RABBITMQ_PORT=${RABBITMQ_PORT}
       - RABBITMQ_TASK_CREATED_QUEUE_NAME=${RABBITMQ_TASK_CREATED_QUEUE_NAME}
       - RABBITMQ_TASK_UPDATED_QUEUE_NAME=${RABBITMQ_TASK_UPDATED_QUEUE_NAME}
-    volumes:
-      - npm_cache:/data/.npm-cache
+      - AUTH_TRUST_HOST=true
+      - AUTH_URL=${AUTH_URL}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
+      - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
+    labels:
+      - "buildkit.cache.to=type=local,dest=./npm-cache"
+      - "buildkit.cache.from=type=local,src=./npm-cache"
     build:
       context: ./
       dockerfile: ./Dockerfile
       target: runtime_task_service
-    container_name: task-service
     ports:
       - "${TASK_SVC_PORT}:3002"
     depends_on:
@@ -86,8 +91,8 @@ services:
     restart: unless-stopped
 
   notification-service:
+    container_name: notification-service
     environment:
-      - NPM_CONFIG_CACHE=/data/.npm-cache
       - NOTIFY_FROM_EMAIL=noreply@notification-service.local
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_PORT=${MONGODB_PORT}
@@ -99,13 +104,13 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
-    volumes:
-      - npm_cache:/data/.npm-cache
+    labels:
+      - "buildkit.cache.to=type=local,dest=./npm-cache"
+      - "buildkit.cache.from=type=local,src=./npm-cache"
     build:
       context: ./
       dockerfile: ./Dockerfile
       target: runtime_notification_service
-    container_name: notification-service
     depends_on:
       - mongo
       - rabbitmq
@@ -114,7 +119,6 @@ services:
 
   web-ui:
     environment:
-      - NPM_CONFIG_CACHE=/data/.npm-cache
       - WEB_UI_PORT=${WEB_UI_PORT}
       - OAUTH_SVC_PORT=${OAUTH_SVC_PORT}
       - TASK_SVC_PORT=${TASK_SVC_PORT}
@@ -123,8 +127,9 @@ services:
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
       - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
-    volumes:
-      - npm_cache:/data/.npm-cache
+    labels:
+      - "buildkit.cache.to=type=local,dest=./npm-cache"
+      - "buildkit.cache.from=type=local,src=./npm-cache"
     build:
       context: ./
       dockerfile: ./Dockerfile
