@@ -6,7 +6,14 @@ import type { Locals } from './express-types.ts'
 const authServiceHost = process.env.OAUTH_SVC_HOST ?? 'oauth-service'
 const authServicePort = Number(process.env.OAUTH_SVC_PORT ?? 3001)
 const authServiceUrl = `http://${authServiceHost}:${authServicePort}`
-const authConfig = getAuthConfig(authServiceUrl)
+const authConfig = getAuthConfig({
+  authServiceUrl,
+  mtlsFetcherOptions: process.env.REQUIRE_INTERNAL_MTLS ? {
+    keyPath: '../../.certs/task-service/task-service.key.pem',
+    certPath: '../../.certs/task-service/task-service.cert.pem',
+    caPath: '../../.certs/ca/ca.cert.pem',
+  } : undefined
+})
 
 export async function authenticatedUser(
   req: Request,

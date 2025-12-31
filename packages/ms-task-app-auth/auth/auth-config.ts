@@ -1,10 +1,18 @@
 import type { AuthConfig } from '@auth/core'
 import GitHub from '@auth/core/providers/github'
-import { RestAdapter } from 'ms-task-app-auth'
+import { RestAdapter, type CreateMtlsFetcherPathOptions } from 'ms-task-app-auth'
 
-export function getAuthConfig(authServiceUrl: string): AuthConfig {
+export type AuthConfigOptions = {
+  authServiceUrl: string
+  mtlsFetcherOptions?: CreateMtlsFetcherPathOptions
+}
+
+export function getAuthConfig({
+  authServiceUrl,
+  mtlsFetcherOptions,
+}: AuthConfigOptions): AuthConfig {
   return {
-    adapter: RestAdapter({ baseUrl: authServiceUrl }),
+    adapter: RestAdapter({ baseUrl: authServiceUrl, mtlsFetcherOptions }),
     providers: [GitHub],
     session: {
       strategy: 'jwt',

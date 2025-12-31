@@ -1,7 +1,8 @@
-import type { AdapterAccount } from '@auth/core/adapters'
 import { MongoDBAdapter } from '@auth/mongodb-adapter'
 import bodyParser from 'body-parser'
 import express from 'express'
+import fs from 'fs'
+import https from 'https'
 import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 import mongoose from 'mongoose'
 import { coalesceErrorMsg } from 'ms-task-app-common'
@@ -19,7 +20,11 @@ import {
 import { connectMQWithRetry, type AccountLinkedQueueMessage } from 'ms-task-app-service-util'
 import * as z from 'zod'
 
-const port = 3001
+// Server settings
+const servicePort = 3001
+const requireInternalMtls = Boolean(process.env.REQUIRE_INTERNAL_MTLS ?? false)
+
+// DB and MQ settings
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
 const mongoHost = process.env.MONGODB_HOST || 'localhost'
 const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
@@ -43,6 +48,7 @@ function createMongoClient() {
 
 async function main() {
   const app = express()
+  app.set('trust proxy', true)
   app.use(bodyParser.json())
 
   const {
@@ -276,7 +282,10 @@ async function main() {
     try {
       // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!z.uuidv4().safeParse(req.params.sessionToken).success) {
-        console.warn('Get session and user param validation failed', { url: req.url, params: req.params })
+        console.warn('Get session and user param validation failed', {
+          url: req.url,
+          params: req.params,
+        })
         return res.status(404)
       }
 
@@ -431,9 +440,27 @@ async function main() {
     }
   })
 
-  app.listen(port, () => {
-    console.log(`OAuth service listening on port ${port}`)
-  })
+  if (requireInternalMtls) {
+    const privateKeyPath =
+      process.env.OAUTH_SVC_PRIVATE_KEY_PATH ?? '../../.certs/oauth-service/oauth-service.key.pem'
+    const certFilePath =
+      process.env.OAUTH_SVC_CERT_PATH ?? '../../.certs/oauth-service/oauth-service.cert.pem'
+    const caCertPath = process.env.CA_CERT_PATH ?? '../../.certs/ca/ca.cert.pem'
+    const httpsServerOptions: https.ServerOptions = {
+      key: fs.readFileSync(privateKeyPath),
+      cert: fs.readFileSync(certFilePath),
+      ca: fs.readFileSync(caCertPath),
+      requestCert: true, // request client cert
+      rejectUnauthorized: true, // reject connections with invalid or missing client cert
+    }
+    https.createServer(httpsServerOptions, app).listen(servicePort, () => {
+      console.log(`OAuth service listening on secure port ${servicePort}`)
+    })
+  } else {
+    app.listen(servicePort, () => {
+      console.log(`OAuth service listening on port ${servicePort}`)
+    })
+  }
 }
 
 main()

@@ -1,5 +1,7 @@
 import bodyParser from 'body-parser'
 import express from 'express'
+import fs from 'fs'
+import https from 'https'
 import mongoose from 'mongoose'
 import { coalesceErrorMsg } from 'ms-task-app-common'
 import { mapDtoValidationErrors, TaskInputDtoSchema, type TaskInputDto } from 'ms-task-app-dto'
@@ -12,10 +14,13 @@ import {
 } from 'ms-task-app-service-util'
 import { authenticatedUser } from './lib/authenticated-user.ts'
 
-const port = 3002
+// Server settings
+const servicePort = 3002
+const requireInternalMtls = Boolean(process.env.REQUIRE_INTERNAL_MTLS ?? false)
+
+// DB and MQ settings
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
 const mongoHost = process.env.MONGODB_HOST || 'localhost'
-
 const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
 const rabbitMQPort = Number(process.env.RABBITMQ_PORT ?? 5672)
 const rabbitMQTaskCreatedQueueName = process.env.RABBITMQ_TASK_CREATED_QUEUE_NAME ?? 'task_created'
@@ -240,9 +245,27 @@ async function main() {
     res.status(204).send()
   })
 
-  app.listen(port, () => {
-    console.log(`Task service listening on port ${port}`)
-  })
+  if (requireInternalMtls) {
+    const privateKeyPath =
+      process.env.TASK_SVC_PRIVATE_KEY_PATH ?? '../../.certs/task-service/task-service.key.pem'
+    const certFilePath =
+      process.env.TASK_SVC_CERT_PATH ?? '../../.certs/task-service/task-service.cert.pem'
+    const caCertPath = process.env.CA_CERT_PATH ?? '../../.certs/ca/ca.cert.pem'
+    const httpsServerOptions: https.ServerOptions = {
+      key: fs.readFileSync(privateKeyPath),
+      cert: fs.readFileSync(certFilePath),
+      ca: fs.readFileSync(caCertPath),
+      requestCert: true, // request client cert
+      rejectUnauthorized: true, // reject connections with invalid or missing client cert
+    }
+    https.createServer(httpsServerOptions, app).listen(servicePort, () => {
+      console.log(`Task service listening on secure port ${servicePort}`)
+    })
+  } else {
+    app.listen(servicePort, () => {
+      console.log(`Task service listening on port ${servicePort}`)
+    })
+  }
 }
 
 main()

@@ -1,7 +1,21 @@
+export const runtime = 'nodejs'
+
 import { auth } from '@/auth'
 import { matchAndResolveServiceBase } from '@/lib/api-routing'
 import { coalesceErrorMsg, HttpError } from 'ms-task-app-common'
 import { NextResponse } from 'next/server'
+import { createMtlsFetcher } from 'ms-task-app-auth'
+
+let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
+
+if (process.env.REQUIRE_INTERNAL_MTLS) {
+  const mtlsFetcher = createMtlsFetcher({
+    keyPath: '../../.certs/web-ui/web-ui.key.pem',
+    certPath: '../../.certs/web-ui/web-ui.cert.pem',
+    caPath: '../../.certs/ca/ca.cert.pem',
+  })
+  _fetch = mtlsFetcher.fetch
+}
 
 const HOP_BY_HOP = new Set([
   'connection',
@@ -38,28 +52,28 @@ const proxyRequest = auth(async req => {
 
   const targetUri = `${targetBase}${urlObj.search}`
 
-  const outHeaders = new Headers(req.headers)
-  outHeaders.delete('host')
-
-  // Remove any headers that were declared as hop-by-hop in the Connection header.
+  // Filter out any headers that were declared as hop-by-hop in the Connection header.
   // The `Connection` header can list other header names that are only valid
   // for a single transport hop (e.g. `Connection: Keep-Alive, X-Local-Header`).
-  const connectionHeader = outHeaders.get('connection') || outHeaders.get('Connection')
+  const connectionHeader = req.headers.get('connection') || req.headers.get('Connection')
+  const connectionHeaderNames = new Set<string>()
   if (connectionHeader) {
     connectionHeader
       .split(',')
       .map(s => s.trim())
       .filter(Boolean)
-      .forEach(name => {
-        outHeaders.delete(name)
-      })
-    // remove the Connection header itself
-    outHeaders.delete('connection')
-    outHeaders.delete('Connection')
+      .forEach(name => connectionHeaderNames.add(name))
   }
 
-  // Remove standard hop-by-hop headers defined by RFC 7230.
-  for (const h of HOP_BY_HOP) outHeaders.delete(h)
+  const outHeaders: Record<string, string> = req.headers
+    .entries()
+    .filter(
+      ([key]) =>
+        key.toLowerCase() !== 'host' &&
+        !HOP_BY_HOP.has(key.toLowerCase()) &&
+        !connectionHeaderNames.has(key.toLowerCase())
+    )
+    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
 
   // Add X-Forwarded headers to preserve client context when talking to backends.
   // Try to append to an existing X-Forwarded-For if present, otherwise use any
@@ -68,9 +82,9 @@ const proxyRequest = auth(async req => {
   const existingXff = req.headers.get('x-forwarded-for') || ''
   const realIp = req.headers.get('x-real-ip') || 'unknown'
   const xForwardedFor = existingXff ? `${existingXff}, ${realIp}` : realIp
-  outHeaders.set('x-forwarded-for', xForwardedFor)
-  outHeaders.set('x-forwarded-proto', urlObj.protocol.replace(':', ''))
-  outHeaders.set('x-forwarded-host', req.headers.get('host') || urlObj.hostname)
+  outHeaders['x-forwarded-for'] = xForwardedFor
+  outHeaders['x-forwarded-proto'] = urlObj.protocol.replace(':', '')
+  outHeaders['x-forwarded-host'] = req.headers.get('host') || urlObj.hostname
 
   let body: ArrayBuffer | undefined = undefined
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
@@ -81,7 +95,7 @@ const proxyRequest = auth(async req => {
     }
   }
 
-  const forwarded = await fetch(targetUri, {
+  const forwarded = await _fetch(targetUri, {
     method: req.method,
     headers: outHeaders,
     body: body && body.byteLength ? body : undefined,
@@ -96,9 +110,8 @@ const proxyRequest = auth(async req => {
     ? []
     : respConnectionHeader
         ?.split(',')
-        .map(s => s.trim())
+        .map(s => s?.trim().toLowerCase())
         .filter(Boolean)
-        .map(x => x.toLowerCase())
 
   // Remove any headers from the response that were declared hop-by-hop in the
   // response's Connection header (mirror of request-side handling).
