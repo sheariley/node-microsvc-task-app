@@ -5,6 +5,8 @@ import fs from 'fs'
 import https from 'https'
 import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 import mongoose from 'mongoose'
+import morgan from 'morgan'
+import { checkClientCert } from 'ms-task-app-auth'
 import { coalesceErrorMsg } from 'ms-task-app-common'
 import {
   AccountInputDtoSchema,
@@ -22,7 +24,7 @@ import * as z from 'zod'
 
 // Server settings
 const servicePort = 3001
-const requireInternalMtls = Boolean(process.env.REQUIRE_INTERNAL_MTLS ?? false)
+const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
 
 // DB and MQ settings
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
@@ -49,6 +51,7 @@ function createMongoClient() {
 async function main() {
   const app = express()
   app.set('trust proxy', true)
+  app.use(morgan('dev'))
   app.use(bodyParser.json())
 
   const {
@@ -69,6 +72,30 @@ async function main() {
 
   const client = createMongoClient()
   const mongoAuthAdapter = MongoDBAdapter(client)
+
+  if (disableInternalMtls) {
+    console.warn('Running without mTLS.')
+  } else {
+    const authorizedCNs: string[] = ['web-ui', 'task-service', 'notification-service']
+    app.use(
+      checkClientCert(async ({ clientCert, req }) => {
+        if (!clientCert) {
+          console.warn(`Client cert not present for ${req.url}.`)
+          return false
+        }
+
+        const authorized = !!clientCert && authorizedCNs.includes(clientCert.subject.CN)
+        if (authorized) {
+          console.info(`Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`)
+        } else {
+          console.warn(
+            `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
+          )
+        }
+        return authorized
+      })
+    )
+  }
 
   // used for container health-check
   app.get('/ping', async (req, res) => {
@@ -440,7 +467,11 @@ async function main() {
     }
   })
 
-  if (requireInternalMtls) {
+  if (disableInternalMtls) {
+    app.listen(servicePort, () => {
+      console.log(`OAuth service listening on unsecure port ${servicePort}`)
+    })
+  } else {
     const privateKeyPath =
       process.env.OAUTH_SVC_PRIVATE_KEY_PATH ?? '../../.certs/oauth-service/oauth-service.key.pem'
     const certFilePath =
@@ -455,10 +486,6 @@ async function main() {
     }
     https.createServer(httpsServerOptions, app).listen(servicePort, () => {
       console.log(`OAuth service listening on secure port ${servicePort}`)
-    })
-  } else {
-    app.listen(servicePort, () => {
-      console.log(`OAuth service listening on port ${servicePort}`)
     })
   }
 }

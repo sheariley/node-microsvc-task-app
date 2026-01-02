@@ -2,17 +2,21 @@ import { getSession, type Session } from '@auth/express'
 import type { NextFunction, Request, Response } from 'express'
 import { getAuthConfig } from 'ms-task-app-auth'
 import type { Locals } from './express-types.ts'
+import { getServiceBaseUrl } from 'ms-task-app-common'
 
-const authServiceHost = process.env.OAUTH_SVC_HOST ?? 'oauth-service'
-const authServicePort = Number(process.env.OAUTH_SVC_PORT ?? 3001)
-const authServiceUrl = `http://${authServiceHost}:${authServicePort}`
+const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
+const authServiceUrl = getServiceBaseUrl({
+  host: process.env.OAUTH_SVC_HOST ?? 'oauth-service',
+  port: Number(process.env.OAUTH_SVC_PORT ?? 3001),
+  secure: !disableInternalMtls
+})
 const authConfig = getAuthConfig({
   authServiceUrl,
-  mtlsFetcherOptions: process.env.REQUIRE_INTERNAL_MTLS ? {
+  mtlsFetcherOptions: disableInternalMtls ? undefined : {
     keyPath: '../../.certs/task-service/task-service.key.pem',
     certPath: '../../.certs/task-service/task-service.cert.pem',
     caPath: '../../.certs/ca/ca.cert.pem',
-  } : undefined
+  }
 })
 
 export async function authenticatedUser(

@@ -3,6 +3,8 @@ import express from 'express'
 import fs from 'fs'
 import https from 'https'
 import mongoose from 'mongoose'
+import morgan from 'morgan'
+import { checkClientCert } from 'ms-task-app-auth'
 import { coalesceErrorMsg } from 'ms-task-app-common'
 import { mapDtoValidationErrors, TaskInputDtoSchema, type TaskInputDto } from 'ms-task-app-dto'
 import { TaskModel } from 'ms-task-app-entities'
@@ -16,7 +18,7 @@ import { authenticatedUser } from './lib/authenticated-user.ts'
 
 // Server settings
 const servicePort = 3002
-const requireInternalMtls = Boolean(process.env.REQUIRE_INTERNAL_MTLS ?? false)
+const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
 
 // DB and MQ settings
 const mongoPort = Number(process.env.MONGODB_PORT || 27017)
@@ -29,6 +31,7 @@ const rabbitMQTaskUpdatedQueueName = process.env.RABBITMQ_TASK_UPDATED_QUEUE_NAM
 async function main() {
   const app = express()
   app.set('trust proxy', true)
+  app.use(morgan('dev'))
   app.use(bodyParser.json())
 
   const {
@@ -57,6 +60,30 @@ async function main() {
 
   if (taskDbConError || !taskDbCon) {
     process.exit(1)
+  }
+
+  if (disableInternalMtls) {
+    console.warn('Running without mTLS.')
+  } else {
+    const authorizedCNs: string[] = ['web-ui']
+    app.use(
+      checkClientCert(async ({ clientCert, req }) => {
+        if (!clientCert) {
+          console.warn(`Client cert not present for ${req.url}.`)
+          return false
+        }
+
+        const authorized = !!clientCert && authorizedCNs.includes(clientCert.subject.CN)
+        if (authorized) {
+          console.info(`Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`)
+        } else {
+          console.warn(
+            `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
+          )
+        }
+        return authorized
+      })
+    )
   }
 
   // used for container health-check
@@ -245,7 +272,11 @@ async function main() {
     res.status(204).send()
   })
 
-  if (requireInternalMtls) {
+  if (disableInternalMtls) {
+    app.listen(servicePort, () => {
+      console.log(`Task service listening on unsecure port ${servicePort}`)
+    })
+  } else {
     const privateKeyPath =
       process.env.TASK_SVC_PRIVATE_KEY_PATH ?? '../../.certs/task-service/task-service.key.pem'
     const certFilePath =
@@ -260,10 +291,6 @@ async function main() {
     }
     https.createServer(httpsServerOptions, app).listen(servicePort, () => {
       console.log(`Task service listening on secure port ${servicePort}`)
-    })
-  } else {
-    app.listen(servicePort, () => {
-      console.log(`Task service listening on port ${servicePort}`)
     })
   }
 }

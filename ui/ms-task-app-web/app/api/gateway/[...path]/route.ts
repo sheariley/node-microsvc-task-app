@@ -1,14 +1,16 @@
 export const runtime = 'nodejs'
 
 import { auth } from '@/auth'
-import { matchAndResolveServiceBase } from '@/lib/api-routing'
+import { createGatewayServiceResolver, excludeHopByHopHeaders, setXForwardedHeaders } from '@/lib/api-routing'
 import { coalesceErrorMsg, HttpError } from 'ms-task-app-common'
 import { NextResponse } from 'next/server'
 import { createMtlsFetcher } from 'ms-task-app-auth'
+import { serviceRoutes } from './service-routes'
 
 let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
 
-if (process.env.REQUIRE_INTERNAL_MTLS) {
+const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
+if (!disableInternalMtls) {
   const mtlsFetcher = createMtlsFetcher({
     keyPath: '../../.certs/web-ui/web-ui.key.pem',
     certPath: '../../.certs/web-ui/web-ui.cert.pem',
@@ -17,16 +19,7 @@ if (process.env.REQUIRE_INTERNAL_MTLS) {
   _fetch = mtlsFetcher.fetch
 }
 
-const HOP_BY_HOP = new Set([
-  'connection',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailers',
-  'transfer-encoding',
-  'upgrade',
-])
+const gatewaySvcResolver = createGatewayServiceResolver({ routes: serviceRoutes })
 
 const proxyRequest = auth(async req => {
   if (!req.auth) {
@@ -41,7 +34,7 @@ const proxyRequest = auth(async req => {
 
   let targetBase: string
   try {
-    const resolved = await matchAndResolveServiceBase(forwardPath || '/', req)
+    const resolved = await gatewaySvcResolver.resolve(forwardPath || '/', req)
     console.info('API gateway route matched', { from: forwardPath || '/', to: resolved.target })
     targetBase = resolved.target
   } catch (err) {
@@ -51,78 +44,30 @@ const proxyRequest = auth(async req => {
   }
 
   const targetUri = `${targetBase}${urlObj.search}`
-
-  // Filter out any headers that were declared as hop-by-hop in the Connection header.
-  // The `Connection` header can list other header names that are only valid
-  // for a single transport hop (e.g. `Connection: Keep-Alive, X-Local-Header`).
-  const connectionHeader = req.headers.get('connection') || req.headers.get('Connection')
-  const connectionHeaderNames = new Set<string>()
-  if (connectionHeader) {
-    connectionHeader
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-      .forEach(name => connectionHeaderNames.add(name))
-  }
-
-  const outHeaders: Record<string, string> = req.headers
-    .entries()
-    .filter(
-      ([key]) =>
-        key.toLowerCase() !== 'host' &&
-        !HOP_BY_HOP.has(key.toLowerCase()) &&
-        !connectionHeaderNames.has(key.toLowerCase())
-    )
-    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
-
-  // Add X-Forwarded headers to preserve client context when talking to backends.
-  // Try to append to an existing X-Forwarded-For if present, otherwise use any
-  // available client IP header (x-real-ip) or 'unknown'. Note: in many hosting
-  // environments the actual client IP is set by the fronting proxy/load-balancer.
-  const existingXff = req.headers.get('x-forwarded-for') || ''
-  const realIp = req.headers.get('x-real-ip') || 'unknown'
-  const xForwardedFor = existingXff ? `${existingXff}, ${realIp}` : realIp
-  outHeaders['x-forwarded-for'] = xForwardedFor
-  outHeaders['x-forwarded-proto'] = urlObj.protocol.replace(':', '')
-  outHeaders['x-forwarded-host'] = req.headers.get('host') || urlObj.hostname
+  const outHeaders = setXForwardedHeaders(urlObj, excludeHopByHopHeaders(req.headers))
 
   let body: ArrayBuffer | undefined = undefined
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     try {
       body = await req.arrayBuffer()
     } catch {
+      // TODO: Determine if we should handle this better to improve observability (logging, etc...)
       body = undefined
     }
   }
 
-  const forwarded = await _fetch(targetUri, {
+  const serviceResponse = await _fetch(targetUri, {
     method: req.method,
     headers: outHeaders,
     body: body && body.byteLength ? body : undefined,
     redirect: 'manual',
   })
 
-  const respArrayBuffer = await forwarded.arrayBuffer()
-
-  const respConnectionHeader =
-    forwarded.headers.get('connection') || forwarded.headers.get('Connection')
-  const respConHeaders = !respConnectionHeader
-    ? []
-    : respConnectionHeader
-        ?.split(',')
-        .map(s => s?.trim().toLowerCase())
-        .filter(Boolean)
-
-  // Remove any headers from the response that were declared hop-by-hop in the
-  // response's Connection header (mirror of request-side handling).
-  const respHeaders = new Headers()
-  forwarded.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP.has(key.toLowerCase()) && !respConHeaders.includes(key.toLowerCase()))
-      respHeaders.set(key, value)
-  })
+  const respHeaders = excludeHopByHopHeaders(serviceResponse.headers)
+  const respArrayBuffer = await serviceResponse.arrayBuffer()
 
   return new NextResponse(respArrayBuffer, {
-    status: forwarded.status,
+    status: serviceResponse.status,
     headers: respHeaders,
   })
 })
