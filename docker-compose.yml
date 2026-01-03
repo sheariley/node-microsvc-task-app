@@ -63,10 +63,19 @@ services:
     environment:
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
-      - OAUTH_SVC__PRIVATE_KEY_PATH=/app/.certs/oauth-service/oauth-service.key.pem
-      - OAUTH_SVC__CERT_PATH=/app/.certs/oauth-service/oauth-service.cert.pem
-      - OAUTH_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
-      - OAUTH_SVC__KEY_CERT_COMBO_PATH=/app/.certs/oauth-service/oauth-service.pem
+      - OAUTH_SVC__CA_CERT_PATH=/run/secrets/ca.cert.pem
+      - OAUTH_SVC__PRIVATE_KEY_PATH=/run/secrets/oauth-service.key.pem
+      - OAUTH_SVC__CERT_PATH=/run/secrets/oauth-service.cert.pem
+      - OAUTH_SVC__KEY_CERT_COMBO_PATH=/run/secrets/oauth-service.pem
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: oauth_svc_cert
+        target: oauth-service.cert.pem
+      - source: oauth_svc_key
+        target: oauth-service.key.pem
+      - source: oauth_svc_pem
+        target: oauth-service.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -94,10 +103,19 @@ services:
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
       - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
-      - TASK_SVC__PRIVATE_KEY_PATH=/app/.certs/task-service/task-service.key.pem
-      - TASK_SVC__CERT_PATH=/app/.certs/task-service/task-service.cert.pem
-      - TASK_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
-      - TASK_SVC__KEY_CERT_COMBO_PATH=/app/.certs/task-service/task-service.pem
+      - TASK_SVC__CA_CERT_PATH=/run/secrets/ca.cert.pem
+      - TASK_SVC__PRIVATE_KEY_PATH=/run/secrets/task-service.key.pem
+      - TASK_SVC__CERT_PATH=/run/secrets/task-service.cert.pem
+      - TASK_SVC__KEY_CERT_COMBO_PATH=/run/secrets/task-service.pem
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: task_svc_cert
+        target: task-service.cert.pem
+      - source: task_svc_key
+        target: task-service.key.pem
+      - source: task_svc_pem
+        target: task-service.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -126,10 +144,19 @@ services:
       - SMTP__PORT=${SMTP__PORT}
       - SMTP__USER=${SMTP__USER}
       - SMTP__PASS=${SMTP__PASS}
-      - NOTIFY_SVC__PRIVATE_KEY_PATH=/app/.certs/notification-service/notification-service.key.pem
-      - NOTIFY_SVC__CERT_PATH=/app/.certs/notification-service/notification-service.cert.pem
-      - NOTIFY_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
-      - NOTIFY_SVC__KEY_CERT_COMBO_PATH=/app/.certs/notification-service/notification-service.pem
+      - NOTIFY_SVC__CA_CERT_PATH=/run/secrets/ca.cert.pem
+      - NOTIFY_SVC__PRIVATE_KEY_PATH=/run/secrets/notification-service.key.pem
+      - NOTIFY_SVC__CERT_PATH=/run/secrets/notification-service.cert.pem
+      - NOTIFY_SVC__KEY_CERT_COMBO_PATH=/run/secrets/notification-service.pem
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: notify_svc_cert
+        target: notification-service.cert.pem
+      - source: notify_svc_key
+        target: notification-service.key.pem
+      - source: notify_svc_pem
+        target: notification-service.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -153,9 +180,19 @@ services:
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
       - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
-      - WEB_UI__PRIVATE_KEY_PATH=/app/.certs/web-ui/web-ui.key.pem
-      - WEB_UI__CERT_PATH=/app/.certs/web-ui/web-ui.cert.pem
-      - WEB_UI__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
+      - WEB_UI__CA_CERT_PATH=/run/secrets/ca.cert.pem
+      - WEB_UI__PRIVATE_KEY_PATH=/run/secrets/web-ui.key.pem
+      - WEB_UI__CERT_PATH=/run/secrets/web-ui.cert.pem
+      - WEB_UI__KEY_CERT_COMBO_PATH=/run/secrets/web-ui.pem
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: web_ui_cert
+        target: web-ui.cert.pem
+      - source: web_ui_key
+        target: web-ui.key.pem
+      - source: web_ui_pem
+        target: web-ui.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -163,6 +200,20 @@ services:
       context: ./
       dockerfile: ./Dockerfile
       target: runtime_web_ui
+      args:
+        - WEB_UI__CA_CERT_PATH=/run/secrets/ca.cert.pem
+        - WEB_UI__PRIVATE_KEY_PATH=/run/secrets/web-ui.key.pem
+        - WEB_UI__CERT_PATH=/run/secrets/web-ui.cert.pem
+        - WEB_UI__KEY_CERT_COMBO_PATH=/run/secrets/web-ui.pem
+      secrets:
+        - source: ca_cert
+          target: ca.cert.pem
+        - source: web_ui_cert
+          target: web-ui.cert.pem
+        - source: web_ui_key
+          target: web-ui.key.pem
+        - source: web_ui_pem
+          target: web-ui.pem
     container_name: web-ui
     ports:
       - "${WEB_UI__PORT}:3000"
@@ -177,7 +228,36 @@ volumes:
   npm_cache:
 
 secrets:
-  mongo_pem:
-    file: ./.certs/mongo/mongo.pem
   ca_cert:
     file: ./.certs/ca/ca.cert.pem
+  
+  mongo_pem:
+    file: ./.certs/mongo/mongo.pem
+  
+  oauth_svc_cert:
+    file: ./.certs/oauth-service/oauth-service.cert.pem
+  oauth_svc_key:
+    file: ./.certs/oauth-service/oauth-service.key.pem
+  oauth_svc_pem:
+    file: ./.certs/oauth-service/oauth-service.pem
+  
+  task_svc_cert:
+    file: ./.certs/task-service/task-service.cert.pem
+  task_svc_key:
+    file: ./.certs/task-service/task-service.key.pem
+  task_svc_pem:
+    file: ./.certs/task-service/task-service.pem
+  
+  notify_svc_cert:
+    file: ./.certs/notification-service/notification-service.cert.pem
+  notify_svc_key:
+    file: ./.certs/notification-service/notification-service.key.pem
+  notify_svc_pem:
+    file: ./.certs/notification-service/notification-service.pem
+  
+  web_ui_cert:
+    file: ./.certs/web-ui/web-ui.cert.pem
+  web_ui_key:
+    file: ./.certs/web-ui/web-ui.key.pem
+  web_ui_pem:
+    file: ./.certs/web-ui/web-ui.pem

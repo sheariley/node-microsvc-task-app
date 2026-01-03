@@ -74,12 +74,6 @@ RUN npm run build:service-util
 FROM node:24-alpine AS runtime_base
 WORKDIR /app
 
-# Copy CA cert
-# NOTE: This would typically be a well-known CA cert,
-# but this is just an example app so we are using a 
-# locally create CA cert.
-COPY ./.certs/ca/ca.cert.pem ./.certs/ca/
-
 # Copy build artifacts
 COPY --from=build_base /repo/packages/ms-task-app-common ./packages/ms-task-app-common
 COPY --from=build_base /repo/packages/ms-task-app-dto ./packages/ms-task-app-dto
@@ -117,9 +111,6 @@ FROM runtime_base AS runtime_oauth_service
 ARG SVC_NAME=oauth-service OAUTH_SVC_PORT=3001
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
-
-# Copy service-specific key and cert files
-COPY ./.certs/${SVC_NAME}/*.pem ./.certs/${SVC_NAME}/
 
 # Copy build artifacts
 COPY --from=build_oauth_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
@@ -165,9 +156,6 @@ ARG SVC_NAME=task-service TASK_SVC_PORT=3002
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
-# Copy service-specific key and cert files
-COPY ./.certs/${SVC_NAME}/*.pem ./.certs/${SVC_NAME}/
-
 # Copy build artifacts
 COPY --from=build_task_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
 
@@ -211,9 +199,6 @@ ARG SVC_NAME=notification-service
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
-# Copy service-specific key and cert files
-COPY ./.certs/${SVC_NAME}/*.pem ./.certs/${SVC_NAME}/
-
 # Copy build artifacts
 COPY --from=build_notification_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
 
@@ -241,23 +226,22 @@ RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund --save-dev --workspace=ui/ms-task-app-web lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl
 
 FROM build_web_ui_deps AS build_web_ui
+ARG WEB_UI__CA_CERT_PATH
+ARG WEB_UI__PRIVATE_KEY_PATH
+ARG WEB_UI__CERT_PATH
+ARG WEB_UI__KEY_CERT_COMBO_PATH
 WORKDIR /repo
-
-# Copy CA cert
-# NOTE: This would typically be a well-known CA cert,
-# but this is just an example app so we are using a 
-# locally create CA cert.
-COPY ./.certs/ca/ca.cert.pem ./.certs/ca/
-
-# Copy service-specific key and cert files
-COPY ./.certs/web-ui/*.pem ./.certs/web-ui/
 
 COPY ./ui/ms-task-app-web ./ui/ms-task-app-web/
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the service workspace
-RUN npm run build:web
+RUN --mount=type=secret,id=ca.cert.pem,target=${WEB_UI__CA_CERT_PATH} \
+    --mount=type=secret,id=web-ui.key.pem,target=${WEB_UI__PRIVATE_KEY_PATH} \
+    --mount=type=secret,id=web-ui.cert.pem,target=${WEB_UI__CERT_PATH} \
+    --mount=type=secret,id=web-ui.pem,target=${WEB_UI__KEY_CERT_COMBO_PATH} \
+    npm run build:web
 
 FROM runtime_base AS runtime_web_ui
 ARG WEB_UI_PORT=3000 OAUTH_SVC_PORT=3001 TASK_SVC_PORT=3002
@@ -268,11 +252,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-
-# Copy service-specific key and cert files
-COPY ./.certs/web-ui/*.pem ./.certs/web-ui/
-
-COPY --from=build_web_ui /repo/.certs/ca/ca.cert.pem ./.certs/ca/
 
 COPY --from=build_web_ui /repo/package*.json ./
 
