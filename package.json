@@ -19,8 +19,7 @@
     "dev:task-service": "npm run dev --workspace=services/task-service",
     "dev:notification-service": "npm run dev --workspace=services/notification-service",
     "dev:web": "npm run dev --workspace=ui/ms-task-app-web",
-    "dev:dbmq": "docker compose -f docker-compose.dev.yml up --build -d",
-    "stop:dbmq": "docker compose -f docker-compose.dev.yml down",
+    "compose:dev": "docker compose up --build -d mongo rabbitmq smtp-server",
     "compose:up": "docker compose up --build -d",
     "compose:down": "docker compose down"
   },

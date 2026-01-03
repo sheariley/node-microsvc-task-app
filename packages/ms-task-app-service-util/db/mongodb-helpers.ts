@@ -8,6 +8,10 @@ export type MongoDbConnectOptions = {
   retries?: number
   delay?: number
   appName: string
+  tls?: {
+    tlsCAFile: string
+    tlsCertificateKeyFile: string
+  }
 }
 
 export async function connectMongoDbWithRetry({
@@ -17,6 +21,7 @@ export async function connectMongoDbWithRetry({
   appName,
   retries = 5,
   delay = 3000,
+  tls
 }: MongoDbConnectOptions) {
   if (retries <= 0) throw new Error(`Invalid argument value: retries = ${retries}`)
   if (delay <= 0) throw new Error(`Invalid argument value: delay = ${delay}`)
@@ -27,7 +32,11 @@ export async function connectMongoDbWithRetry({
     await wait(delay)
     try {
       console.log(`Connecting to MongoDB at ${uri}...`)
-      const connection = await mongoose.connect(uri, { appName })
+      const connection = await mongoose.connect(uri, {
+        appName,
+        tls: !!tls,
+        ...(tls ? tls : {})
+      })
       console.log('Connected to MongoDB')
       return { connection, error: null }
     } catch (error) {

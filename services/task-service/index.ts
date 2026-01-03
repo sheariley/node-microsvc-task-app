@@ -54,6 +54,10 @@ async function main() {
     port: serverEnv.mongodb.port,
     dbName: 'tasks',
     appName: 'task-service',
+    tls: serverEnv.disableInternalMtls ? undefined : {
+      tlsCAFile: serverEnv.taskSvc.caCertPath,
+      tlsCertificateKeyFile: serverEnv.taskSvc.keyCertComboPath
+    }
   }))!
 
   if (taskDbConError || !taskDbCon) {

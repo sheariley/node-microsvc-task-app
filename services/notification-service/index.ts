@@ -52,6 +52,10 @@ async function main() {
     port: serverEnv.mongodb.port,
     dbName: 'oauth',
     appName: 'notification-service',
+    tls: serverEnv.disableInternalMtls ? undefined : {
+      tlsCAFile: serverEnv.notifySvc.caCertPath,
+      tlsCertificateKeyFile: serverEnv.notifySvc.keyCertComboPath
+    }
   }))!
 
   if (userDbConError || !userDbCon) {

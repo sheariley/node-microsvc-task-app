@@ -8,7 +8,7 @@ It will create:
 - ./.certs/ca/ca.key.pem and ca.cert.pem
 - ./.certs/<service>/<service>.key.pem, .csr, .cert.pem and san.ext for each service
 
-Services generated: mongo, rabbitmq, oauth-service, task-service, web-ui
+Default services generated: mongo, rabbitmq, oauth-service, task-service, notification-service, web-ui
  
  Optional argument:
  - `-Services` : An array or comma-separated list of service names to generate certs for.
@@ -54,7 +54,7 @@ $caDir = Join-Path $certsRoot 'ca'
 New-DirectoryIfMissing $caDir
 
 ## Default services list (used when -Services is not provided)
-$defaultServices = @('mongo', 'rabbitmq', 'oauth-service', 'task-service', 'web-ui')
+$defaultServices = @('mongo', 'rabbitmq', 'oauth-service', 'task-service', 'notification-service', 'web-ui')
 
 # If -Services was passed, normalize it to an array. Accept comma-separated, space-separated,
 # or multiple arguments (including positional leftover args).
@@ -179,6 +179,18 @@ IP.1 = 127.0.0.1
 
   Write-Output "Verification for $s (Subject and Subject Alternative Name):"
   openssl x509 -in $cert -noout -text | Select-String -Pattern "Subject:", "X509v3 Subject Alternative Name" -Context 0, 2
+
+  # Create combined PEM (private key + certificate) suitable for services that
+  # expect a single file containing the key followed by the cert (e.g. MongoDB).
+  $pem = Join-Path $svcDir "$s.pem"
+  Write-Output "Creating combined PEM (private key + certificate) at: $pem"
+  # Ensure the output is overwritten and contains the private key first, then the cert
+  Get-Content $key -Raw | Out-File -FilePath $pem -Encoding ascii
+  Get-Content $cert -Raw | Add-Content -Path $pem -Encoding ascii
+
+  Write-Output " - private key: $key"
+  Write-Output " - certificate: $cert"
+  Write-Output " - combined PEM: $pem"
 }
 
 Write-Output "All certificates created under: $certsRoot"

@@ -7,7 +7,12 @@ import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 import mongoose from 'mongoose'
 import morgan from 'morgan'
 import { checkClientCert } from 'ms-task-app-auth'
-import { coalesceErrorMsg, getServerConfig, redactedServerConfig } from 'ms-task-app-common'
+import {
+  coalesceErrorMsg,
+  getServerConfig,
+  redactedServerConfig,
+  type TaskAppServerConfig,
+} from 'ms-task-app-common'
 import {
   AccountInputDtoSchema,
   mapDtoValidationErrors,
@@ -19,14 +24,18 @@ import {
   type UserDto,
   type VerificationTokenInputDto,
 } from 'ms-task-app-dto'
-import { connectMQWithRetry, disableResponseCaching, type AccountLinkedQueueMessage } from 'ms-task-app-service-util'
+import {
+  connectMQWithRetry,
+  disableResponseCaching,
+  type AccountLinkedQueueMessage,
+} from 'ms-task-app-service-util'
 import * as z from 'zod'
 
 // Server settings
 const servicePort = 3001
 
-function createMongoClient({ host, port }: { host: string; port: number }) {
-  const uri = `mongodb://${host}:${port}/oauth`
+async function createMongoClient(serverEnv: TaskAppServerConfig) {
+  const uri = `mongodb://${serverEnv.mongodb.host}:${serverEnv.mongodb.port}/oauth`
   const options: MongoClientOptions = {
     appName: 'oauth-service',
     serverApi: {
@@ -34,9 +43,20 @@ function createMongoClient({ host, port }: { host: string; port: number }) {
       strict: true,
       deprecationErrors: true,
     },
+    tls: true,
+    tlsCAFile: serverEnv.oauthSvc.caCertPath,
+    tlsCertificateKeyFile: serverEnv.oauthSvc.keyCertComboPath,
   }
 
-  return new MongoClient(uri, options)
+  console.info(`Connecting to MongoDB at ${uri}...`)
+  try {
+    const client = new MongoClient(uri, options)
+    await client.connect()
+    console.info('Connected to MongoDB')
+    return client
+  } catch (error) {
+    throw new Error('MongoDB connection failed', { cause: error })
+  }
 }
 
 async function main() {
@@ -67,7 +87,7 @@ async function main() {
   console.log('Asserting message queues...')
   await mqChannel.assertQueue(serverEnv.rabbitmq.accountLinkedQueueName)
 
-  const client = createMongoClient(serverEnv.mongodb)
+  const client = await createMongoClient(serverEnv)
   const mongoAuthAdapter = MongoDBAdapter(client)
 
   if (serverEnv.disableInternalMtls) {

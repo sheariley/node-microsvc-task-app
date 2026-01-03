@@ -119,7 +119,7 @@ ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
 # Copy service-specific key and cert files
-COPY ./.certs/${SVC_NAME}/${SVC_NAME}.*.pem ./.certs/${SVC_NAME}/
+COPY ./.certs/${SVC_NAME}/*.pem ./.certs/${SVC_NAME}/
 
 # Copy build artifacts
 COPY --from=build_oauth_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
@@ -166,7 +166,7 @@ ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
 # Copy service-specific key and cert files
-COPY ./.certs/${SVC_NAME}/${SVC_NAME}.*.pem ./.certs/${SVC_NAME}/
+COPY ./.certs/${SVC_NAME}/*.pem ./.certs/${SVC_NAME}/
 
 # Copy build artifacts
 COPY --from=build_task_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
@@ -211,6 +211,9 @@ ARG SVC_NAME=notification-service
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
+# Copy service-specific key and cert files
+COPY ./.certs/${SVC_NAME}/*.pem ./.certs/${SVC_NAME}/
+
 # Copy build artifacts
 COPY --from=build_notification_service /repo/services/${SVC_NAME}/dist ./services/${SVC_NAME}/dist/
 
@@ -247,7 +250,7 @@ WORKDIR /repo
 COPY ./.certs/ca/ca.cert.pem ./.certs/ca/
 
 # Copy service-specific key and cert files
-COPY ./.certs/web-ui/web-ui.*.pem ./.certs/web-ui/
+COPY ./.certs/web-ui/*.pem ./.certs/web-ui/
 
 COPY ./ui/ms-task-app-web ./ui/ms-task-app-web/
 
@@ -267,7 +270,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy service-specific key and cert files
-COPY ./.certs/web-ui/web-ui.*.pem ./.certs/web-ui/
+COPY ./.certs/web-ui/*.pem ./.certs/web-ui/
 
 COPY --from=build_web_ui /repo/.certs/ca/ca.cert.pem ./.certs/ca/
 

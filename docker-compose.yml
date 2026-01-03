@@ -2,12 +2,26 @@ name: micro-service-task-app
 
 services:
   mongo:
-    container_name: mongo
     volumes:
       - mongo_data:/data/db
     image: mongodb/mongodb-community-server:8.0-ubi8
+    container_name: mongo
     ports:
       - "${MONGODB__PORT}:27017"
+    secrets:
+      - source: mongo_pem
+        target: mongo.pem
+      - source: ca_cert
+        target: ca.cert.pem
+    command:
+      - mongod
+      - --bind_ip_all
+      - --tlsMode
+      - requireTLS
+      - --tlsCertificateKeyFile
+      - /run/secrets/mongo.pem
+      - --tlsCAFile
+      - /run/secrets/ca.cert.pem
     restart: unless-stopped
 
   rabbitmq:
@@ -52,6 +66,7 @@ services:
       - OAUTH_SVC__PRIVATE_KEY_PATH=/app/.certs/oauth-service/oauth-service.key.pem
       - OAUTH_SVC__CERT_PATH=/app/.certs/oauth-service/oauth-service.cert.pem
       - OAUTH_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
+      - OAUTH_SVC__KEY_CERT_COMBO_PATH=/app/.certs/oauth-service/oauth-service.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -82,6 +97,7 @@ services:
       - TASK_SVC__PRIVATE_KEY_PATH=/app/.certs/task-service/task-service.key.pem
       - TASK_SVC__CERT_PATH=/app/.certs/task-service/task-service.cert.pem
       - TASK_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
+      - TASK_SVC__KEY_CERT_COMBO_PATH=/app/.certs/task-service/task-service.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -110,6 +126,10 @@ services:
       - SMTP__PORT=${SMTP__PORT}
       - SMTP__USER=${SMTP__USER}
       - SMTP__PASS=${SMTP__PASS}
+      - NOTIFY_SVC__PRIVATE_KEY_PATH=/app/.certs/notification-service/notification-service.key.pem
+      - NOTIFY_SVC__CERT_PATH=/app/.certs/notification-service/notification-service.cert.pem
+      - NOTIFY_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
+      - NOTIFY_SVC__KEY_CERT_COMBO_PATH=/app/.certs/notification-service/notification-service.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -155,3 +175,9 @@ volumes:
   mongo_data:
   mail_data:
   npm_cache:
+
+secrets:
+  mongo_pem:
+    file: ./.certs/mongo/mongo.pem
+  ca_cert:
+    file: ./.certs/ca/ca.cert.pem
