@@ -8,10 +8,22 @@ It will create:
 - ./.certs/ca/ca.key.pem and ca.cert.pem
 - ./.certs/<service>/<service>.key.pem, .csr, .cert.pem and san.ext for each service
 
-Services generated: oauth-service, task-service, web-ui
+Services generated: mongo, rabbitmq, oauth-service, task-service, web-ui
+ 
+ Optional argument:
+ - `-Services` : An array or comma-separated list of service names to generate certs for.
+   If omitted, the script uses the default list defined below.
+- `-Test` : Switch to run the script in test mode. When provided the script will create
+  certificates under a `test` subfolder of the `.certs` directory (i.e. `./.certs/test`).
+  Useful to avoid clobbering real dev certs during experimentation.
 
 This script requires OpenSSL to be available on PATH.
 #>
+
+Param(
+  [string[]]$Services,
+  [switch]$Test
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -20,6 +32,12 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $repoRoot = (Resolve-Path (Join-Path $scriptRoot '..')).Path
 $certsRoot = Join-Path $repoRoot '.certs'
 
+# If test mode requested, use a separate test subdirectory to avoid overwriting real certs
+if ($Test) {
+  $certsRoot = Join-Path $certsRoot 'test'
+  Write-Output "Test mode enabled — certificates will be created under: $certsRoot"
+}
+
 # Ensure OpenSSL is available
 if (-not (Get-Command openssl -ErrorAction SilentlyContinue)) {
   Write-Error "OpenSSL not found on PATH. Install OpenSSL or add it to PATH and re-run the script."
@@ -27,7 +45,7 @@ if (-not (Get-Command openssl -ErrorAction SilentlyContinue)) {
 }
 
 function New-DirectoryIfMissing([string]$p) {
-    if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
+  if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
 }
 
 New-DirectoryIfMissing $certsRoot
@@ -35,7 +53,45 @@ New-DirectoryIfMissing $certsRoot
 $caDir = Join-Path $certsRoot 'ca'
 New-DirectoryIfMissing $caDir
 
-$services = @('oauth-service','task-service','web-ui')
+## Default services list (used when -Services is not provided)
+$defaultServices = @('mongo', 'rabbitmq', 'oauth-service', 'task-service', 'web-ui')
+
+# If -Services was passed, normalize it to an array. Accept comma-separated, space-separated,
+# or multiple arguments (including positional leftover args).
+if ($PSBoundParameters.ContainsKey('Services')) {
+  $raw = @()
+  if ($null -ne $Services) {
+    $raw += @($Services)
+  }
+  # Also include any leftover positional args in $args (in case caller supplied space-separated values)
+  if ($args -and $args.Count -gt 0) { $raw += $args }
+
+  $normalized = @()
+  foreach ($item in $raw) {
+    if (-not $item) { continue }
+    if ($item -match ',') {
+      $normalized += ($item -split '\s*,\s*')
+    }
+    elseif ($item -match '\s') {
+      $normalized += ($item -split '\s+')
+    }
+    else {
+      $normalized += $item
+    }
+  }
+
+  $services = $normalized | Where-Object { $_ -ne '' }
+  if (-not $services -or $services.Count -eq 0) {
+    Write-Output "Creating certificates for the default list of services."
+    $services = $defaultServices
+  }
+}
+else {
+  $services = $defaultServices
+}
+
+Write-Output "Creating certificates for services: $($services -join ', ')"
+
 foreach ($s in $services) { New-DirectoryIfMissing (Join-Path $certsRoot $s) }
 
 # Create CA if missing
@@ -69,19 +125,20 @@ keyUsage = critical, digitalSignature, cRLSign, keyCertSign
     -out $caCert `
     -config $caConfig `
     -extensions v3_ca
-} else {
-    Write-Output "CA key and cert already exist, skipping creation."
+}
+else {
+  Write-Output "CA key and cert already exist, skipping creation."
 }
 
 # Generate and sign service certs
 foreach ($s in $services) {
-    $svcDir = Join-Path $certsRoot $s
-    $key = Join-Path $svcDir "$s.key.pem"
-    $csr = Join-Path $svcDir "$s.csr"
-    $cert = Join-Path $svcDir "$s.cert.pem"
-    # Create an OpenSSL config for this service (includes SANs and v3_req)
-    $svcConfig = Join-Path $svcDir "$s.cnf"
-    $svcConfigContent = @"
+  $svcDir = Join-Path $certsRoot $s
+  $key = Join-Path $svcDir "$s.key.pem"
+  $csr = Join-Path $svcDir "$s.csr"
+  $cert = Join-Path $svcDir "$s.cert.pem"
+  # Create an OpenSSL config for this service (includes SANs and v3_req)
+  $svcConfig = Join-Path $svcDir "$s.cnf"
+  $svcConfigContent = @"
 [ req ]
 default_bits       = 2048
 distinguished_name = dn
@@ -102,26 +159,26 @@ DNS.1 = localhost
 DNS.2 = $s
 IP.1 = 127.0.0.1
 "@
-    Set-Content -Path $svcConfig -Value $svcConfigContent -Encoding Ascii
+  Set-Content -Path $svcConfig -Value $svcConfigContent -Encoding Ascii
 
-    Write-Output "Generating key and CSR for $s"
-    openssl req -new -newkey rsa:2048 -nodes `
-      -keyout $key `
-      -out $csr `
-      -config $svcConfig
+  Write-Output "Generating key and CSR for $s"
+  openssl req -new -newkey rsa:2048 -nodes `
+    -keyout $key `
+    -out $csr `
+    -config $svcConfig
 
-    Write-Output "Signing CSR for $s with CA (embedding SANs)"
-    openssl x509 -req -sha256 -days 3650 `
-      -in $csr `
-      -CA $caCert `
-      -CAkey $caKey `
-      -CAcreateserial `
-      -out $cert `
-      -extfile $svcConfig `
-      -extensions v3_req
+  Write-Output "Signing CSR for $s with CA (embedding SANs)"
+  openssl x509 -req -sha256 -days 3650 `
+    -in $csr `
+    -CA $caCert `
+    -CAkey $caKey `
+    -CAcreateserial `
+    -out $cert `
+    -extfile $svcConfig `
+    -extensions v3_req
 
-    Write-Output "Verification for $s (Subject and Subject Alternative Name):"
-    openssl x509 -in $cert -noout -text | Select-String -Pattern "Subject:","X509v3 Subject Alternative Name" -Context 0,2
+  Write-Output "Verification for $s (Subject and Subject Alternative Name):"
+  openssl x509 -in $cert -noout -text | Select-String -Pattern "Subject:", "X509v3 Subject Alternative Name" -Context 0, 2
 }
 
 Write-Output "All certificates created under: $certsRoot"
