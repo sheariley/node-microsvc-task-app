@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import NextAuth, { type NextAuthConfig } from 'next-auth'
 import { getAuthConfig } from 'ms-task-app-auth'
 import { getServerConfig, getServiceBaseUrl } from 'ms-task-app-common'
@@ -14,9 +16,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth(
   getAuthConfig({
     authServiceUrl,
     mtlsFetcherOptions: serverEnv.disableInternalMtls ? undefined : {
-      keyPath: '../../.certs/web-ui/web-ui.key.pem',
-      certPath: '../../.certs/web-ui/web-ui.cert.pem',
-      caPath: '../../.certs/ca/ca.cert.pem',
+      keyPath: serverEnv.webUi.privateKeyPath,
+      certPath: serverEnv.webUi.certPath,
+      caPath: serverEnv.webUi.caCertPath,
     },
   }) as NextAuthConfig
 )

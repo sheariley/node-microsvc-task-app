@@ -7,23 +7,23 @@ services:
       - mongo_data:/data/db
     image: mongodb/mongodb-community-server:8.0-ubi8
     ports:
-      - "${MONGODB_PORT}:27017"
+      - "${MONGODB__PORT}:27017"
     restart: unless-stopped
 
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:4.2-management-alpine
     ports:
-      - "${RABBITMQ_PORT}:5672"
-      - "${RABBITMQ_WEB_PORT}:15672"
+      - "${RABBITMQ__PORT}:5672"
+      - "${RABBITMQ__WEB_PORT}:15672"
     restart: unless-stopped
 
   smtp-server:
     container_name: smtp-server
     environment:
-      - MAILDEV_SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
+      - MAILDEV_SMTP_PORT=${SMTP__PORT}
+      - SMTP__USER=${SMTP__USER}
+      - SMTP__PASS=${SMTP__PASS}
       - MAILDEV_WEB_PORT=${MAILDEV_WEB_PORT}
     volumes:
       - mail_data:/maildata
@@ -31,24 +31,27 @@ services:
     user: root
     ports:
       - "${MAILDEV_WEB_PORT}:1080" # Web UI
-      - "${SMTP_PORT}:1025" # SMTP server
+      - "${SMTP__PORT}:1025" # SMTP server
     command:
       [
         "maildev",
         "--mail-directory",
         "/maildata",
         "--incoming-user",
-        "${SMTP_USER}",
+        "${SMTP__USER}",
         "--incoming-pass",
-        "${SMTP_PASS}",
+        "${SMTP__PASS}",
       ]
     restart: unless-stopped
 
   oauth-service:
     container_name: oauth-service
     environment:
-      - MONGODB_HOST=${MONGODB_HOST}
-      - MONGODB_PORT=${MONGODB_PORT}
+      - MONGODB__HOST=${MONGODB__HOST}
+      - MONGODB__PORT=${MONGODB__PORT}
+      - OAUTH_SVC__PRIVATE_KEY_PATH=/app/.certs/oauth-service/oauth-service.key.pem
+      - OAUTH_SVC__CERT_PATH=/app/.certs/oauth-service/oauth-service.cert.pem
+      - OAUTH_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -57,7 +60,7 @@ services:
       dockerfile: ./Dockerfile
       target: runtime_oauth_service
     ports:
-      - "${OAUTH_SVC_PORT}:3001"
+      - "${OAUTH_SVC__PORT}:3001"
     depends_on:
       - mongo
     restart: unless-stopped
@@ -65,17 +68,20 @@ services:
   task-service:
     container_name: task-service
     environment:
-      - MONGODB_HOST=${MONGODB_HOST}
-      - MONGODB_PORT=${MONGODB_PORT}
-      - RABBITMQ_HOST=${RABBITMQ_HOST}
-      - RABBITMQ_PORT=${RABBITMQ_PORT}
-      - RABBITMQ_TASK_CREATED_QUEUE_NAME=${RABBITMQ_TASK_CREATED_QUEUE_NAME}
-      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=${RABBITMQ_TASK_UPDATED_QUEUE_NAME}
+      - MONGODB__HOST=${MONGODB__HOST}
+      - MONGODB__PORT=${MONGODB__PORT}
+      - RABBITMQ__HOST=${RABBITMQ__HOST}
+      - RABBITMQ__PORT=${RABBITMQ__PORT}
+      - RABBITMQ__TASK_CREATED_QUEUE_NAME=${RABBITMQ__TASK_CREATED_QUEUE_NAME}
+      - RABBITMQ__TASK_UPDATED_QUEUE_NAME=${RABBITMQ__TASK_UPDATED_QUEUE_NAME}
       - AUTH_TRUST_HOST=true
       - AUTH_URL=${AUTH_URL}
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
       - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
+      - TASK_SVC__PRIVATE_KEY_PATH=/app/.certs/task-service/task-service.key.pem
+      - TASK_SVC__CERT_PATH=/app/.certs/task-service/task-service.cert.pem
+      - TASK_SVC__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -84,7 +90,7 @@ services:
       dockerfile: ./Dockerfile
       target: runtime_task_service
     ports:
-      - "${TASK_SVC_PORT}:3002"
+      - "${TASK_SVC__PORT}:3002"
     depends_on:
       - mongo
       - rabbitmq
@@ -93,17 +99,17 @@ services:
   notification-service:
     container_name: notification-service
     environment:
-      - NOTIFY_FROM_EMAIL=noreply@notification-service.local
-      - MONGODB_HOST=${MONGODB_HOST}
-      - MONGODB_PORT=${MONGODB_PORT}
-      - RABBITMQ_HOST=${RABBITMQ_HOST}
-      - RABBITMQ_PORT=${RABBITMQ_PORT}
-      - RABBITMQ_TASK_CREATED_QUEUE_NAME=${RABBITMQ_TASK_CREATED_QUEUE_NAME}
-      - RABBITMQ_TASK_UPDATED_QUEUE_NAME=${RABBITMQ_TASK_UPDATED_QUEUE_NAME}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
+      - NOTIFY_SVC__FROM_EMAIL=noreply@notification-service.local
+      - MONGODB__HOST=${MONGODB__HOST}
+      - MONGODB__PORT=${MONGODB__PORT}
+      - RABBITMQ__HOST=${RABBITMQ__HOST}
+      - RABBITMQ__PORT=${RABBITMQ__PORT}
+      - RABBITMQ__TASK_CREATED_QUEUE_NAME=${RABBITMQ__TASK_CREATED_QUEUE_NAME}
+      - RABBITMQ__TASK_UPDATED_QUEUE_NAME=${RABBITMQ__TASK_UPDATED_QUEUE_NAME}
+      - SMTP__HOST=${SMTP__HOST}
+      - SMTP__PORT=${SMTP__PORT}
+      - SMTP__USER=${SMTP__USER}
+      - SMTP__PASS=${SMTP__PASS}
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -119,14 +125,17 @@ services:
 
   web-ui:
     environment:
-      - WEB_UI_PORT=${WEB_UI_PORT}
-      - OAUTH_SVC_PORT=${OAUTH_SVC_PORT}
-      - TASK_SVC_PORT=${TASK_SVC_PORT}
+      - WEB_UI__PORT=${WEB_UI__PORT}
+      - OAUTH_SVC__PORT=${OAUTH_SVC__PORT}
+      - TASK_SVC__PORT=${TASK_SVC__PORT}
       - AUTH_TRUST_HOST=true
       - AUTH_URL=${AUTH_URL}
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_GITHUB_ID=${AUTH_GITHUB_ID}
       - AUTH_GITHUB_SECRET=${AUTH_GITHUB_SECRET}
+      - WEB_UI__PRIVATE_KEY_PATH=/app/.certs/web-ui/web-ui.key.pem
+      - WEB_UI__CERT_PATH=/app/.certs/web-ui/web-ui.cert.pem
+      - WEB_UI__CA_CERT_PATH=/app/.certs/ca/ca.cert.pem
     labels:
       - "buildkit.cache.to=type=local,dest=./npm-cache"
       - "buildkit.cache.from=type=local,src=./npm-cache"
@@ -136,7 +145,7 @@ services:
       target: runtime_web_ui
     container_name: web-ui
     ports:
-      - "${WEB_UI_PORT}:3000"
+      - "${WEB_UI__PORT}:3000"
     depends_on:
       - oauth-service
       - task-service

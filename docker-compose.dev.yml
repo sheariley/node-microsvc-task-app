@@ -7,22 +7,22 @@ services:
     image: mongodb/mongodb-community-server:8.0-ubi8
     container_name: mongo
     ports:
-      - "${MONGODB_PORT}:27017"
+      - "${MONGODB__PORT}:27017"
     restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:4.2-management-alpine
     container_name: rabbitmq
     ports:
-      - "${RABBITMQ_PORT}:5672"
-      - "${RABBITMQ_WEB_PORT}:15672"
+      - "${RABBITMQ__PORT}:5672"
+      - "${RABBITMQ__WEB_PORT}:15672"
     restart: unless-stopped
 
   smtp-server:
     environment:
-      - MAILDEV_SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
+      - MAILDEV_SMTP__PORT=${SMTP__PORT}
+      - SMTP__USER=${SMTP__USER}
+      - SMTP__PASS=${SMTP__PASS}
       - MAILDEV_WEB_PORT=${MAILDEV_WEB_PORT}
     volumes:
       - mail_data:/maildata
@@ -31,16 +31,16 @@ services:
     user: root
     ports:
       - "${MAILDEV_WEB_PORT}:1080" # Web UI
-      - "${SMTP_PORT}:1025" # SMTP server
+      - "${SMTP__PORT}:1025" # SMTP server
     command:
       [
         "maildev",
         "--mail-directory",
         "/maildata",
         "--incoming-user",
-        "${SMTP_USER}",
+        "${SMTP__USER}",
         "--incoming-pass",
-        "${SMTP_PASS}",
+        "${SMTP__PASS}",
       ]
     restart: unless-stopped
 

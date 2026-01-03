@@ -470,9 +470,9 @@ async function main() {
     })
   } else {
     const httpsServerOptions: https.ServerOptions = {
-      key: fs.readFileSync(serverEnv.taskSvc.privateKeyPath),
-      cert: fs.readFileSync(serverEnv.taskSvc.certPath),
-      ca: fs.readFileSync(serverEnv.taskSvc.caCertPath),
+      key: fs.readFileSync(serverEnv.oauthSvc.privateKeyPath),
+      cert: fs.readFileSync(serverEnv.oauthSvc.certPath),
+      ca: fs.readFileSync(serverEnv.oauthSvc.caCertPath),
       requestCert: true, // request client cert
       rejectUnauthorized: true, // reject connections with invalid or missing client cert
     }

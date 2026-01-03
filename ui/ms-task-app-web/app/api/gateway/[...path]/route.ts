@@ -1,4 +1,5 @@
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 import { auth } from '@/auth'
 import { createGatewayServiceResolver, excludeHopByHopHeaders, setXForwardedHeaders } from '@/lib/api-routing'
@@ -6,6 +7,7 @@ import { coalesceErrorMsg, getServerConfig, HttpError } from 'ms-task-app-common
 import { NextResponse } from 'next/server'
 import { createMtlsFetcher } from 'ms-task-app-auth'
 import { serviceRoutes } from './service-routes'
+import { headers } from 'next/headers'
 
 let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
 
@@ -13,9 +15,9 @@ const serverEnv = getServerConfig()
 
 if (!serverEnv.disableInternalMtls) {
   const mtlsFetcher = createMtlsFetcher({
-    keyPath: '../../.certs/web-ui/web-ui.key.pem',
-    certPath: '../../.certs/web-ui/web-ui.cert.pem',
-    caPath: '../../.certs/ca/ca.cert.pem',
+    keyPath: serverEnv.webUi.privateKeyPath,
+    certPath: serverEnv.webUi.certPath,
+    caPath: serverEnv.webUi.caCertPath,
   })
   _fetch = mtlsFetcher.fetch
 }
@@ -45,7 +47,8 @@ const proxyRequest = auth(async req => {
   }
 
   const targetUri = `${targetBase}${urlObj.search}`
-  const outHeaders = setXForwardedHeaders(urlObj, excludeHopByHopHeaders(req.headers))
+  const nextHeaders = await headers()
+  const outHeaders = setXForwardedHeaders(urlObj, excludeHopByHopHeaders(nextHeaders))
 
   let body: ArrayBuffer | undefined = undefined
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {

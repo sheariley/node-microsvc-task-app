@@ -13,9 +13,9 @@ const authServiceUrl = getServiceBaseUrl({
 const authConfig = getAuthConfig({
   authServiceUrl,
   mtlsFetcherOptions: serverEnv.disableInternalMtls ? undefined : {
-    keyPath: '../../.certs/task-service/task-service.key.pem',
-    certPath: '../../.certs/task-service/task-service.cert.pem',
-    caPath: '../../.certs/ca/ca.cert.pem',
+    keyPath: serverEnv.taskSvc.privateKeyPath,
+    certPath: serverEnv.taskSvc.certPath,
+    caPath: serverEnv.taskSvc.caCertPath,
   }
 })
 
