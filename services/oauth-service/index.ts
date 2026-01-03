@@ -7,7 +7,7 @@ import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 import mongoose from 'mongoose'
 import morgan from 'morgan'
 import { checkClientCert } from 'ms-task-app-auth'
-import { coalesceErrorMsg } from 'ms-task-app-common'
+import { coalesceErrorMsg, getServerConfig, redactedServerConfig } from 'ms-task-app-common'
 import {
   AccountInputDtoSchema,
   mapDtoValidationErrors,
@@ -19,23 +19,14 @@ import {
   type UserDto,
   type VerificationTokenInputDto,
 } from 'ms-task-app-dto'
-import { connectMQWithRetry, type AccountLinkedQueueMessage } from 'ms-task-app-service-util'
+import { connectMQWithRetry, disableResponseCaching, type AccountLinkedQueueMessage } from 'ms-task-app-service-util'
 import * as z from 'zod'
 
 // Server settings
 const servicePort = 3001
-const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
 
-// DB and MQ settings
-const mongoPort = Number(process.env.MONGODB_PORT || 27017)
-const mongoHost = process.env.MONGODB_HOST || 'localhost'
-const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
-const rabbitMQPort = Number(process.env.RABBITMQ_PORT ?? 5672)
-const rabbitMQAccountLinkedQueueName =
-  process.env.RABBITMQ_ACCOUNT_LINKED_QUEUE_NAME ?? 'account_linked'
-
-function createMongoClient() {
-  const uri = `mongodb://${mongoHost}:${mongoPort}/oauth`
+function createMongoClient({ host, port }: { host: string; port: number }) {
+  const uri = `mongodb://${host}:${port}/oauth`
   const options: MongoClientOptions = {
     appName: 'oauth-service',
     serverApi: {
@@ -49,18 +40,24 @@ function createMongoClient() {
 }
 
 async function main() {
+  const serverEnv = getServerConfig()
+  console.info('Sever Config', redactedServerConfig(serverEnv))
   const app = express()
+
   app.set('trust proxy', true)
+  app.set('etag', false)
+
   app.use(morgan('dev'))
   app.use(bodyParser.json())
+  app.use(disableResponseCaching)
 
   const {
     mqConnection,
     mqChannel,
     error: mqError,
   } = (await connectMQWithRetry({
-    host: rabbitMQHost,
-    port: rabbitMQPort,
+    host: serverEnv.rabbitmq.host,
+    port: serverEnv.rabbitmq.port,
   }))!
 
   if (mqError || !mqConnection || !mqChannel) {
@@ -68,12 +65,12 @@ async function main() {
   }
 
   console.log('Asserting message queues...')
-  await mqChannel.assertQueue(rabbitMQAccountLinkedQueueName)
+  await mqChannel.assertQueue(serverEnv.rabbitmq.accountLinkedQueueName)
 
-  const client = createMongoClient()
+  const client = createMongoClient(serverEnv.mongodb)
   const mongoAuthAdapter = MongoDBAdapter(client)
 
-  if (disableInternalMtls) {
+  if (serverEnv.disableInternalMtls) {
     console.warn('Running without mTLS.')
   } else {
     const authorizedCNs: string[] = ['web-ui', 'task-service', 'notification-service']
@@ -267,7 +264,7 @@ async function main() {
       }
       try {
         mqChannel.sendToQueue(
-          rabbitMQAccountLinkedQueueName,
+          serverEnv.rabbitmq.accountLinkedQueueName,
           Buffer.from(JSON.stringify(accountLinkedMsg))
         )
       } catch (mqSendErr) {
@@ -467,20 +464,15 @@ async function main() {
     }
   })
 
-  if (disableInternalMtls) {
+  if (serverEnv.disableInternalMtls) {
     app.listen(servicePort, () => {
       console.log(`OAuth service listening on unsecure port ${servicePort}`)
     })
   } else {
-    const privateKeyPath =
-      process.env.OAUTH_SVC_PRIVATE_KEY_PATH ?? '../../.certs/oauth-service/oauth-service.key.pem'
-    const certFilePath =
-      process.env.OAUTH_SVC_CERT_PATH ?? '../../.certs/oauth-service/oauth-service.cert.pem'
-    const caCertPath = process.env.CA_CERT_PATH ?? '../../.certs/ca/ca.cert.pem'
     const httpsServerOptions: https.ServerOptions = {
-      key: fs.readFileSync(privateKeyPath),
-      cert: fs.readFileSync(certFilePath),
-      ca: fs.readFileSync(caCertPath),
+      key: fs.readFileSync(serverEnv.taskSvc.privateKeyPath),
+      cert: fs.readFileSync(serverEnv.taskSvc.certPath),
+      ca: fs.readFileSync(serverEnv.taskSvc.caCertPath),
       requestCert: true, // request client cert
       rejectUnauthorized: true, // reject connections with invalid or missing client cert
     }

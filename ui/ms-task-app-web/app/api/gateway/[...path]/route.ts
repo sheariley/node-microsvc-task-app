@@ -2,15 +2,16 @@ export const runtime = 'nodejs'
 
 import { auth } from '@/auth'
 import { createGatewayServiceResolver, excludeHopByHopHeaders, setXForwardedHeaders } from '@/lib/api-routing'
-import { coalesceErrorMsg, HttpError } from 'ms-task-app-common'
+import { coalesceErrorMsg, getServerConfig, HttpError } from 'ms-task-app-common'
 import { NextResponse } from 'next/server'
 import { createMtlsFetcher } from 'ms-task-app-auth'
 import { serviceRoutes } from './service-routes'
 
 let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
 
-const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
-if (!disableInternalMtls) {
+const serverEnv = getServerConfig()
+
+if (!serverEnv.disableInternalMtls) {
   const mtlsFetcher = createMtlsFetcher({
     keyPath: '../../.certs/web-ui/web-ui.key.pem',
     certPath: '../../.certs/web-ui/web-ui.cert.pem',

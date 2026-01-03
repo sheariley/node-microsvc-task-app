@@ -1,4 +1,9 @@
-import { coalesceErrorMsg } from 'ms-task-app-common'
+import {
+  coalesceErrorMsg,
+  redactedServerConfig,
+  getServerConfig,
+  type TaskAppServerConfig,
+} from 'ms-task-app-common'
 import { UserModel } from 'ms-task-app-entities'
 import {
   connectMongoDbWithRetry,
@@ -9,42 +14,28 @@ import {
 } from 'ms-task-app-service-util'
 import nodemailer from 'nodemailer'
 
-const mongoPort = Number(process.env.MONGODB_PORT || 27017)
-const mongoHost = process.env.MONGODB_HOST || 'localhost'
-
-const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
-const rabbitMQPort = Number(process.env.RABBITMQ_PORT ?? 5672)
-const rabbitMQTaskCreatedQueueName = process.env.RABBITMQ_TASK_CREATED_QUEUE_NAME ?? 'task_created'
-const rabbitMQTaskUpdatedQueueName = process.env.RABBITMQ_TASK_UPDATED_QUEUE_NAME ?? 'task_updated'
-const rabbitMQAccountLinkedQueueName =
-  process.env.RABBITMQ_ACCOUNT_LINKED_QUEUE_NAME ?? 'account_linked'
-
-const smtpHost = process.env.SMTP_HOST ?? 'smtp-server'
-const smtpPort = Number(process.env.SMTP_PORT ?? 1025)
-const smtpUser = process.env.SMTP_USER ?? 'maildevuser'
-const smtpPass = process.env.SMTP_PASS ?? 'maildevpass'
-const notifyFromEmail = process.env.NOTIFY_FROM_EMAIL ?? 'noreply@notification-service.local'
-
-function createMailTransport() {
+function createMailTransport({ host, port, user, pass }: TaskAppServerConfig['smtp']) {
   return nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
+    host,
+    port,
     secure: false,
     auth: {
-      user: smtpUser,
-      pass: smtpPass,
+      user,
+      pass,
     },
   })
 }
 
 async function main() {
+  const serverEnv = getServerConfig()
+  console.info('Sever Config', redactedServerConfig(serverEnv))
   const {
     mqConnection,
     mqChannel,
     error: mqError,
   } = (await connectMQWithRetry({
-    host: rabbitMQHost,
-    port: rabbitMQPort,
+    host: serverEnv.rabbitmq.host,
+    port: serverEnv.rabbitmq.port,
   }))!
 
   if (mqError || !mqConnection || !mqChannel) {
@@ -52,24 +43,24 @@ async function main() {
   }
 
   console.log('Asserting message queues...')
-  await mqChannel.assertQueue(rabbitMQTaskCreatedQueueName)
-  await mqChannel.assertQueue(rabbitMQTaskUpdatedQueueName)
-  await mqChannel.assertQueue(rabbitMQAccountLinkedQueueName)
+  await mqChannel.assertQueue(serverEnv.rabbitmq.taskCreatedQueueName)
+  await mqChannel.assertQueue(serverEnv.rabbitmq.taskUpdatedQueueName)
+  await mqChannel.assertQueue(serverEnv.rabbitmq.accountLinkedQueueName)
 
   const { connection: userDbCon, error: userDbConError } = (await connectMongoDbWithRetry({
-    host: mongoHost,
-    port: mongoPort,
+    host: serverEnv.mongodb.host,
+    port: serverEnv.mongodb.port,
     dbName: 'oauth',
-    appName: 'notification-service'
+    appName: 'notification-service',
   }))!
 
   if (userDbConError || !userDbCon) {
     process.exit(1)
   }
 
-  const mailTransport = createMailTransport()
+  const mailTransport = createMailTransport(serverEnv.smtp)
 
-  mqChannel.consume(rabbitMQTaskCreatedQueueName, async msg => {
+  mqChannel.consume(serverEnv.rabbitmq.taskCreatedQueueName, async msg => {
     if (msg) {
       try {
         const payload: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
@@ -92,7 +83,7 @@ async function main() {
         }
 
         const mailResult = await mailTransport.sendMail({
-          from: notifyFromEmail,
+          from: serverEnv.notifySvc.fromEmail,
           to: user.email,
           subject: 'A new task was created',
           text: `A new task was created for you! The title was "${payload.title}".`,
@@ -111,7 +102,7 @@ async function main() {
     }
   })
 
-  mqChannel.consume(rabbitMQTaskUpdatedQueueName, async msg => {
+  mqChannel.consume(serverEnv.rabbitmq.taskUpdatedQueueName, async msg => {
     if (msg) {
       try {
         const payload: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
@@ -134,7 +125,7 @@ async function main() {
         }
 
         const mailResult = await mailTransport.sendMail({
-          from: notifyFromEmail,
+          from: serverEnv.notifySvc.fromEmail,
           to: user.email,
           subject: 'A task was updated',
           text: `The task titled "${payload.title}" was updated. Completed: ${payload.completed}`,
@@ -153,7 +144,7 @@ async function main() {
     }
   })
 
-  mqChannel.consume(rabbitMQAccountLinkedQueueName, async msg => {
+  mqChannel.consume(serverEnv.rabbitmq.accountLinkedQueueName, async msg => {
     if (msg) {
       try {
         const payload: AccountLinkedQueueMessage = JSON.parse(msg.content.toString())
@@ -176,7 +167,7 @@ async function main() {
         }
 
         const mailResult = await mailTransport.sendMail({
-          from: notifyFromEmail,
+          from: serverEnv.notifySvc.fromEmail,
           to: user.email,
           subject: 'An account of yours was linked',
           text: `Your ${payload.provider} account was linked.`,

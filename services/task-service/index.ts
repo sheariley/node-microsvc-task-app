@@ -5,12 +5,13 @@ import https from 'https'
 import mongoose from 'mongoose'
 import morgan from 'morgan'
 import { checkClientCert } from 'ms-task-app-auth'
-import { coalesceErrorMsg } from 'ms-task-app-common'
+import { coalesceErrorMsg, getServerConfig, redactedServerConfig } from 'ms-task-app-common'
 import { mapDtoValidationErrors, TaskInputDtoSchema, type TaskInputDto } from 'ms-task-app-dto'
 import { TaskModel } from 'ms-task-app-entities'
 import {
   connectMongoDbWithRetry,
   connectMQWithRetry,
+  disableResponseCaching,
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
@@ -18,29 +19,26 @@ import { authenticatedUser } from './lib/authenticated-user.ts'
 
 // Server settings
 const servicePort = 3002
-const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
-
-// DB and MQ settings
-const mongoPort = Number(process.env.MONGODB_PORT || 27017)
-const mongoHost = process.env.MONGODB_HOST || 'localhost'
-const rabbitMQHost = process.env.RABBITMQ_HOST || 'rabbitmq'
-const rabbitMQPort = Number(process.env.RABBITMQ_PORT ?? 5672)
-const rabbitMQTaskCreatedQueueName = process.env.RABBITMQ_TASK_CREATED_QUEUE_NAME ?? 'task_created'
-const rabbitMQTaskUpdatedQueueName = process.env.RABBITMQ_TASK_UPDATED_QUEUE_NAME ?? 'task_updated'
 
 async function main() {
+  const serverEnv = getServerConfig()
+  console.info('Sever Config', redactedServerConfig(serverEnv))
   const app = express()
+  
   app.set('trust proxy', true)
+  app.set('etag', false)
+
   app.use(morgan('dev'))
   app.use(bodyParser.json())
+  app.use(disableResponseCaching)
 
   const {
     mqConnection,
     mqChannel,
     error: mqError,
   } = (await connectMQWithRetry({
-    host: rabbitMQHost,
-    port: rabbitMQPort,
+    host: serverEnv.rabbitmq.host,
+    port: serverEnv.rabbitmq.port,
   }))!
 
   if (mqError || !mqConnection || !mqChannel) {
@@ -48,12 +46,12 @@ async function main() {
   }
 
   console.log('Asserting message queues...')
-  await mqChannel.assertQueue(rabbitMQTaskCreatedQueueName)
-  await mqChannel.assertQueue(rabbitMQTaskUpdatedQueueName)
+  await mqChannel.assertQueue(serverEnv.rabbitmq.taskCreatedQueueName)
+  await mqChannel.assertQueue(serverEnv.rabbitmq.taskUpdatedQueueName)
 
   const { connection: taskDbCon, error: taskDbConError } = (await connectMongoDbWithRetry({
-    host: mongoHost,
-    port: mongoPort,
+    host: serverEnv.mongodb.host,
+    port: serverEnv.mongodb.port,
     dbName: 'tasks',
     appName: 'task-service',
   }))!
@@ -62,7 +60,7 @@ async function main() {
     process.exit(1)
   }
 
-  if (disableInternalMtls) {
+  if (serverEnv.disableInternalMtls) {
     console.warn('Running without mTLS.')
   } else {
     const authorizedCNs: string[] = ['web-ui']
@@ -175,7 +173,7 @@ async function main() {
           title,
         }
         mqChannel.sendToQueue(
-          rabbitMQTaskCreatedQueueName,
+          serverEnv.rabbitmq.taskCreatedQueueName,
           Buffer.from(JSON.stringify(taskCreatedMsg))
         )
       }
@@ -236,7 +234,7 @@ async function main() {
           completed: task.completed,
         }
         mqChannel.sendToQueue(
-          rabbitMQTaskUpdatedQueueName,
+          serverEnv.rabbitmq.taskUpdatedQueueName,
           Buffer.from(JSON.stringify(taskUpdatedMsg))
         )
       }
@@ -272,20 +270,15 @@ async function main() {
     res.status(204).send()
   })
 
-  if (disableInternalMtls) {
+  if (serverEnv.disableInternalMtls) {
     app.listen(servicePort, () => {
       console.log(`Task service listening on unsecure port ${servicePort}`)
     })
   } else {
-    const privateKeyPath =
-      process.env.TASK_SVC_PRIVATE_KEY_PATH ?? '../../.certs/task-service/task-service.key.pem'
-    const certFilePath =
-      process.env.TASK_SVC_CERT_PATH ?? '../../.certs/task-service/task-service.cert.pem'
-    const caCertPath = process.env.CA_CERT_PATH ?? '../../.certs/ca/ca.cert.pem'
     const httpsServerOptions: https.ServerOptions = {
-      key: fs.readFileSync(privateKeyPath),
-      cert: fs.readFileSync(certFilePath),
-      ca: fs.readFileSync(caCertPath),
+      key: fs.readFileSync(serverEnv.taskSvc.privateKeyPath),
+      cert: fs.readFileSync(serverEnv.taskSvc.certPath),
+      ca: fs.readFileSync(serverEnv.taskSvc.caCertPath),
       requestCert: true, // request client cert
       rejectUnauthorized: true, // reject connections with invalid or missing client cert
     }

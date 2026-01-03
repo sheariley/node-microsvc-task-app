@@ -1,16 +1,17 @@
 import { RouteEntry } from '@/lib/api-routing'
-import { getServiceBaseUrl } from 'ms-task-app-common'
+import { getServerConfig, getServiceBaseUrl } from 'ms-task-app-common'
 
-const disableInternalMtls = process.env.DISABLE_INTERNAL_MTLS === 'true'
+const serverEnv = getServerConfig()
+
 const taskServiceBaseUrl = getServiceBaseUrl({
-  host: process.env.TASK_SVC_HOST ?? 'task-service',
-  port: Number(process.env.TASK_SVC_PORT ?? 3002),
-  secure: !disableInternalMtls,
+  host: serverEnv.taskSvc.host,
+  port: serverEnv.taskSvc.port,
+  secure: !serverEnv.disableInternalMtls,
 })
 const oauthServiceBaseUrl = getServiceBaseUrl({
-  host: process.env.OAUTH_SVC_HOST ?? 'oauth-service',
-  port: Number(process.env.OAUTH_SVC_PORT ?? 3001),
-  secure: !disableInternalMtls,
+  host: serverEnv.oauthSvc.host,
+  port: serverEnv.oauthSvc.port,
+  secure: !serverEnv.disableInternalMtls,
 })
 
 // NOTE: Order matters because first match wins!
