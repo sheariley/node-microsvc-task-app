@@ -36,6 +36,7 @@ async function main() {
   } = (await connectMQWithRetry({
     host: serverEnv.rabbitmq.host,
     port: serverEnv.rabbitmq.port,
+    tls: serverEnv.disableInternalMtls ? undefined : serverEnv.notifySvc,
   }))!
 
   if (mqError || !mqConnection || !mqChannel) {
@@ -52,10 +53,12 @@ async function main() {
     port: serverEnv.mongodb.port,
     dbName: 'oauth',
     appName: 'notification-service',
-    tls: serverEnv.disableInternalMtls ? undefined : {
-      tlsCAFile: serverEnv.notifySvc.caCertPath,
-      tlsCertificateKeyFile: serverEnv.notifySvc.keyCertComboPath
-    }
+    tls: serverEnv.disableInternalMtls
+      ? undefined
+      : {
+          tlsCAFile: serverEnv.notifySvc.caCertPath,
+          tlsCertificateKeyFile: serverEnv.notifySvc.keyCertComboPath,
+        },
   }))!
 
   if (userDbConError || !userDbCon) {

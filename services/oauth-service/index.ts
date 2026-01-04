@@ -78,6 +78,7 @@ async function main() {
   } = (await connectMQWithRetry({
     host: serverEnv.rabbitmq.host,
     port: serverEnv.rabbitmq.port,
+    tls: serverEnv.disableInternalMtls ? undefined : serverEnv.oauthSvc,
   }))!
 
   if (mqError || !mqConnection || !mqChannel) {

@@ -28,8 +28,17 @@ services:
     container_name: rabbitmq
     image: rabbitmq:4.2-management-alpine
     ports:
-      - "${RABBITMQ__PORT}:5672"
+      - "${RABBITMQ__PORT}:5671"
       - "${RABBITMQ__WEB_PORT}:15672"
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: rabbitmq_cert
+        target: rabbitmq.cert.pem
+      - source: rabbitmq_key
+        target: rabbitmq.key.pem
     restart: unless-stopped
 
   smtp-server:
@@ -233,6 +242,11 @@ secrets:
   
   mongo_pem:
     file: ./.certs/mongo/mongo.pem
+
+  rabbitmq_cert:
+    file: ./.certs/rabbitmq/rabbitmq.cert.pem
+  rabbitmq_key:
+    file: ./.certs/rabbitmq/rabbitmq.key.pem
   
   oauth_svc_cert:
     file: ./.certs/oauth-service/oauth-service.cert.pem

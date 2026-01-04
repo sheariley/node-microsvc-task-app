@@ -24,7 +24,7 @@ async function main() {
   const serverEnv = getServerConfig()
   console.info('Sever Config', redactedServerConfig(serverEnv))
   const app = express()
-  
+
   app.set('trust proxy', true)
   app.set('etag', false)
 
@@ -39,6 +39,7 @@ async function main() {
   } = (await connectMQWithRetry({
     host: serverEnv.rabbitmq.host,
     port: serverEnv.rabbitmq.port,
+    tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
   }))!
 
   if (mqError || !mqConnection || !mqChannel) {
@@ -54,10 +55,12 @@ async function main() {
     port: serverEnv.mongodb.port,
     dbName: 'tasks',
     appName: 'task-service',
-    tls: serverEnv.disableInternalMtls ? undefined : {
-      tlsCAFile: serverEnv.taskSvc.caCertPath,
-      tlsCertificateKeyFile: serverEnv.taskSvc.keyCertComboPath
-    }
+    tls: serverEnv.disableInternalMtls
+      ? undefined
+      : {
+          tlsCAFile: serverEnv.taskSvc.caCertPath,
+          tlsCertificateKeyFile: serverEnv.taskSvc.keyCertComboPath,
+        },
   }))!
 
   if (taskDbConError || !taskDbCon) {
