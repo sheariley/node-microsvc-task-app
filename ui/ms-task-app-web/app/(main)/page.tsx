@@ -1,5 +1,5 @@
 import { auth } from '@/auth'
-import { TaskList } from '../components/task-list/task-list'
+import { TaskListView } from './task-list-view'
 
 export default async function HomePage() {
   const session = await auth()
@@ -16,9 +16,10 @@ export default async function HomePage() {
         </>
       ) : (
         <>
-          <TaskList userId={session.user!.id!} />
+          <TaskListView userId={session.user!.id!} />
         </>
       )}
     </div>
   )
 }
+

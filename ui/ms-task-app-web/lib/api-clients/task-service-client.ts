@@ -30,16 +30,11 @@ type ApiRequestOptionsWithBody = ApiRequestOptions & {
 const GATEWAY_BASE = '/api/gateway'
 
 export type TaskServiceClient = {
-  getUserTasks(userId: string, opt?: ApiRequestOptions): Promise<TaskDto[]>
-  getUserTaskById(userId: string, taskId: string, opt?: ApiRequestOptions): Promise<TaskDto>
-  createTask(userId: string, input: TaskInputDto, opt?: ApiRequestOptions): Promise<TaskDto>
-  updateTask(
-    userId: string,
-    taskId: string,
-    input: Partial<TaskInputDto>,
-    opt?: ApiRequestOptions
-  ): Promise<void>
-  deleteTask(userId: string, taskId: string, opt?: ApiRequestOptions): Promise<void>
+  getUserTasks(userId: string): Promise<TaskDto[]>
+  getUserTaskById(userId: string, taskId: string): Promise<TaskDto>
+  createTask(userId: string, input: TaskInputDto): Promise<TaskDto>
+  updateTask(userId: string, taskId: string, input: Partial<TaskInputDto>): Promise<void>
+  deleteTask(userId: string, taskId: string): Promise<void>
 }
 
 function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceClient {
@@ -71,43 +66,33 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
   }
 
   return {
-    async getUserTasks(userId: string, opt?: ApiRequestOptions) {
+    async getUserTasks(userId: string) {
       return (await request(`/users/${encodeURIComponent(userId)}/tasks`, {
-        ...(opt ?? {}),
         method: 'GET',
       })) as TaskDto[]
     },
 
-    async getUserTaskById(userId: string, taskId: string, opt?: ApiRequestOptions) {
+    async getUserTaskById(userId: string, taskId: string) {
       return (await request(
         `/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`,
-        { ...(opt ?? {}), method: 'GET' }
+        { method: 'GET' }
       )) as TaskDto
     },
 
-    async createTask(userId: string, input: TaskInputDto, opt?: ApiRequestOptions) {
+    async createTask(userId: string, input: TaskInputDto) {
       return (await request(`/users/${encodeURIComponent(userId)}/tasks`, {
-        ...(opt ?? {}),
         method: 'POST',
         headers: {
-          ...(opt?.headers as Record<string, string> | undefined),
           'content-type': 'application/json',
         },
         body: JSON.stringify(input),
       })) as TaskDto
     },
 
-    async updateTask(
-      userId: string,
-      taskId: string,
-      input: Partial<TaskInputDto>,
-      opt?: ApiRequestOptions
-    ) {
+    async updateTask(userId: string, taskId: string, input: Partial<TaskInputDto>) {
       await request(`/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`, {
-        ...opt,
         method: 'PUT',
         headers: {
-          ...opt?.headers,
           'content-type': 'application/json',
         },
         body: JSON.stringify(input),
@@ -115,9 +100,8 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
       return
     },
 
-    async deleteTask(userId: string, taskId: string, opt?: ApiRequestOptions) {
+    async deleteTask(userId: string, taskId: string) {
       await request(`/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`, {
-        ...(opt ?? {}),
         method: 'DELETE',
       })
       return
@@ -125,9 +109,6 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
   }
 }
 
-/**
- * Get a TaskServiceClient instance.
- */
 export function getTaskServiceClient(headers?: Record<string, string>): TaskServiceClient {
   return makeTaskServiceClient(headers)
 }
@@ -143,4 +124,3 @@ function isApiErrorResponse(obj: unknown): obj is ApiErrorResponse {
 }
 
 export type { ApiError }
-

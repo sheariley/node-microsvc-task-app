@@ -27,8 +27,8 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
     task = { title: '', description: '', completed: false }
   } else {
     try {
-      const client = await getSSRTaskServiceClient()
-      task = await client.getUserTaskById(session.user.id!, taskId)
+      const taskApiClient = await getSSRTaskServiceClient()
+      task = await taskApiClient.getUserTaskById(session.user.id!, taskId)
     } catch (err) {
       // network or unexpected error — show an alert instead of silently falling back
       console.error('Failed to fetch task', err)
