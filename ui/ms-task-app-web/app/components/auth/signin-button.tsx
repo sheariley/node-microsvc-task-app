@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@heroui/react'
+import { Button } from '@/app/components/ui'
 import { signIn, signOut, useSession } from 'next-auth/react'
 
 //import { initiateSignIn, initiateSignOut } from '@/server-actions/auth'

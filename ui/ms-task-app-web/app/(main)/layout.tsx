@@ -1,6 +1,6 @@
 'use client'
 
-import { Link, Navbar, NavbarBrand, NavbarContent, NavbarItem } from '@heroui/react'
+import { Link, Navbar, NavbarBrand, NavbarContent, NavbarItem } from '@/app/components/ui'
 import { SignInButton } from '../components/auth'
 import { Logo } from '../components/logo/logo'
 

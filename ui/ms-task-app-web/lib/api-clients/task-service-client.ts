@@ -1,4 +1,4 @@
-import { TaskDto } from 'ms-task-app-dto'
+import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
 import React from 'react'
 
 type ApiErrorResponse = {
@@ -18,86 +18,123 @@ class ApiError extends Error {
   }
 }
 
-const GATEWAY_BASE = '/api/gateway'
-
-async function request<T>(path: string, init?: RequestInit) {
-  const url = `${GATEWAY_BASE}${path}`
-  const res = await fetch(url, { credentials: 'include', ...init })
-
-  let body: T | null = null
-  body = await res.json()
-
-  if (!res.ok) {
-    const msg = isApiErrorResponse(body) ? body.message : res.statusText || 'API error'
-    throw new ApiError(msg, res.status, { response: body })
-  }
-
-  return body
+type ApiRequestOptions = {
+  method?: string
+  headers?: Record<string, string>
 }
 
-export function useTaskServiceClient() {
-  const getUserTasks = React.useCallback(async (userId: string) => {
-    return (await request(`/users/${encodeURIComponent(userId)}/tasks`, { method: 'GET' })) as TaskDto[]
-  }, [])
+type ApiRequestOptionsWithBody = ApiRequestOptions & {
+  body?: string
+}
 
-  const getUserTaskById = React.useCallback(async (userId: string, taskId: string) => {
-    return await request(
-      `/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`,
-      {
+const GATEWAY_BASE = '/api/gateway'
+
+export type TaskServiceClient = {
+  getUserTasks(userId: string, opt?: ApiRequestOptions): Promise<TaskDto[]>
+  getUserTaskById(userId: string, taskId: string, opt?: ApiRequestOptions): Promise<TaskDto>
+  createTask(userId: string, input: TaskInputDto, opt?: ApiRequestOptions): Promise<TaskDto>
+  updateTask(
+    userId: string,
+    taskId: string,
+    input: Partial<TaskInputDto>,
+    opt?: ApiRequestOptions
+  ): Promise<void>
+  deleteTask(userId: string, taskId: string, opt?: ApiRequestOptions): Promise<void>
+}
+
+function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceClient {
+  async function request<T>(path: string, opt?: ApiRequestOptionsWithBody) {
+    const outHeaders: Record<string, string> = {
+      ...headers,
+      ...opt?.headers,
+    }
+    let baseUrl = GATEWAY_BASE
+    if (outHeaders.host && outHeaders['x-forwarded-proto']) {
+      baseUrl = `${outHeaders['x-forwarded-proto']}://${outHeaders.host}${GATEWAY_BASE}`
+    }
+    const url = `${baseUrl}${path}`
+    const res = await fetch(url, {
+      credentials: 'include',
+      ...opt,
+      headers: outHeaders,
+    })
+
+    let body: T | null = null
+    body = await res.json()
+
+    if (!res.ok) {
+      const msg = isApiErrorResponse(body) ? body.message : res.statusText || 'API error'
+      throw new ApiError(msg, res.status, { response: body })
+    }
+
+    return body
+  }
+
+  return {
+    async getUserTasks(userId: string, opt?: ApiRequestOptions) {
+      return (await request(`/users/${encodeURIComponent(userId)}/tasks`, {
+        ...(opt ?? {}),
         method: 'GET',
-      }
-    )
-  }, [])
-
-  const createTask = React.useCallback(
-    async (userId: string, input: { title: string; description?: string; completed?: boolean }) => {
-      return await request(`/users/${encodeURIComponent(userId)}/tasks`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(input),
-      }) as TaskDto
+      })) as TaskDto[]
     },
-    []
-  )
 
-  const updateTask = React.useCallback(
-    async (
+    async getUserTaskById(userId: string, taskId: string, opt?: ApiRequestOptions) {
+      return (await request(
+        `/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`,
+        { ...(opt ?? {}), method: 'GET' }
+      )) as TaskDto
+    },
+
+    async createTask(userId: string, input: TaskInputDto, opt?: ApiRequestOptions) {
+      return (await request(`/users/${encodeURIComponent(userId)}/tasks`, {
+        ...(opt ?? {}),
+        method: 'POST',
+        headers: {
+          ...(opt?.headers as Record<string, string> | undefined),
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(input),
+      })) as TaskDto
+    },
+
+    async updateTask(
       userId: string,
       taskId: string,
-      input: Partial<{ title: string; description?: string; completed?: boolean }>
-    ) => {
-      // Task service returns 204 on success (no content)
+      input: Partial<TaskInputDto>,
+      opt?: ApiRequestOptions
+    ) {
       await request(`/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`, {
+        ...opt,
         method: 'PUT',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          ...opt?.headers,
+          'content-type': 'application/json',
+        },
         body: JSON.stringify(input),
       })
       return
     },
-    []
-  )
 
-  const deleteTask = React.useCallback(async (userId: string, taskId: string) => {
-    // Task service returns 204 on success (no content)
-    await request(`/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`, {
-      method: 'DELETE',
-    })
-    return
-  }, [])
+    async deleteTask(userId: string, taskId: string, opt?: ApiRequestOptions) {
+      await request(`/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`, {
+        ...(opt ?? {}),
+        method: 'DELETE',
+      })
+      return
+    },
+  }
+}
 
-  return React.useMemo(() => ({
-    getUserTasks,
-    getUserTaskById,
-    createTask,
-    updateTask,
-    deleteTask
-  }), [
-    getUserTasks,
-    getUserTaskById,
-    createTask,
-    updateTask,
-    deleteTask
-  ])
+/**
+ * Get a TaskServiceClient instance.
+ */
+export function getTaskServiceClient(headers?: Record<string, string>): TaskServiceClient {
+  return makeTaskServiceClient(headers)
+}
+
+export function useTaskServiceClient() {
+  const client = React.useMemo(() => makeTaskServiceClient(), [])
+  return client
 }
 
 function isApiErrorResponse(obj: unknown): obj is ApiErrorResponse {
@@ -106,3 +143,4 @@ function isApiErrorResponse(obj: unknown): obj is ApiErrorResponse {
 }
 
 export type { ApiError }
+

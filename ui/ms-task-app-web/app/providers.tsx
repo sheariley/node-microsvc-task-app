@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { HeroUIProvider } from '@heroui/react'
+import { HeroUIProvider, ToastProvider } from '@/app/components/ui'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { SessionProvider } from 'next-auth/react'
 
@@ -17,7 +17,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <NextThemesProvider attribute="class" defaultTheme="dark">
-        <HeroUIProvider navigate={router.push}>{children}</HeroUIProvider>
+        <HeroUIProvider navigate={router.push}>
+          <ToastProvider />
+          {children}
+        </HeroUIProvider>
       </NextThemesProvider>
     </SessionProvider>
   )

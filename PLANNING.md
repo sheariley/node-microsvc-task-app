@@ -74,6 +74,12 @@ Build a task management app composed of containerized micro-services that allows
   - NextJS/React: SSR/SSG, web server
   - HeroUI V2: Low-level UI components
   - TailwindCSS - Styling and theming
+  - SWR - Async data fetching/streaming
+- Architectural guidelines
+  - Maximize usage of server-side rendering
+  - Maximize usage of SWR for fetching data and async state management in client-side components
+  - Minimize usage of client-side state
+  - Avoid using direct calls to `fetch` to make requests to APIs. Instead use the API clients in `@/lib/api-clients`.
 - Styling
   - Simple and clean, but still polished and easy on the eyes
   - 1 light and 1 dark theme; defaulting to system preference

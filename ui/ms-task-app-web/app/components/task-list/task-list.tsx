@@ -2,7 +2,7 @@
 
 import { useUserTasks } from '@/lib/hooks'
 import { cn } from '@/lib/ui-helpers'
-import { Alert, Button, Skeleton } from '@heroui/react'
+import { Alert, Button, Link, Skeleton } from '@/app/components/ui'
 import { RocketIcon } from 'lucide-react'
 import { coalesceErrorMsg } from 'ms-task-app-common'
 import React from 'react'
@@ -39,7 +39,7 @@ export function TaskList({ userId, className, ...props }: TaskListProps) {
     return (
       <div className={cn(baseClassName, 'items-center gap-4', className)}>
         <div>You don&apos;t have any tasks at the moment.</div>
-        <Button type="button" color="primary" aria-label="Create New Task">
+        <Button color="primary" aria-label="Create New Task" as={Link} href="/tasks/new">
           <RocketIcon />
           Create a New One!
         </Button>

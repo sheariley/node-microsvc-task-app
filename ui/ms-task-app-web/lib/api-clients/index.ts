@@ -1,2 +1,1 @@
-export * from './task-service-client'
-export * from './oauth-service-client'
+export { useTaskServiceClient } from './task-service-client'
