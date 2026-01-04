@@ -1,45 +1,54 @@
 'use client'
 
-import { useTaskServiceClient } from '@/lib/api-clients'
-import { Alert } from '@heroui/react'
+import { useUserTasks } from '@/lib/hooks'
+import { cn } from '@/lib/ui-helpers'
+import { Alert, Button, Skeleton } from '@heroui/react'
+import { RocketIcon } from 'lucide-react'
 import { coalesceErrorMsg } from 'ms-task-app-common'
-import { TaskDto } from 'ms-task-app-dto'
 import React from 'react'
 
 export type TaskListProps = React.ComponentProps<'ul'> & {
   userId: string
 }
 
-export function TaskList({
-  userId,
-  ...props
-}: TaskListProps) {
-  const [taskFetchError, setTaskFetchError] = React.useState('')
-  const [tasks, setTasks] = React.useState<TaskDto[]>([])
-  const taskClient = useTaskServiceClient()
+const baseClassName = 'flex flex-col items-stretch gap-2 min-w-[300px] max-w-[550px]'
 
-  React.useEffect(() => {
-    async function fetchTasks() {
-      try {
-        const results = await taskClient.getUserTasks(userId)
-        setTasks(results)
-      } catch (error) {
-        const msg = coalesceErrorMsg(error)
-        setTaskFetchError(msg)
-      }
-    }
+export function TaskList({ userId, className, ...props }: TaskListProps) {
+  const { tasks, tasksLoadError, tasksLoading } = useUserTasks(userId)
 
-    fetchTasks()
-  }, [taskClient, userId])
+  if (tasksLoadError) {
+    const msg = coalesceErrorMsg(tasksLoadError)
+    return (
+      <div className={cn(baseClassName, className)}>
+        <Alert color="danger" title={msg} />
+      </div>
+    )
+  }
 
-  if (taskFetchError?.length) {
-    return <div className="w-full flex items-center my-3">
-      <Alert color="danger" title={taskFetchError} />
-    </div>
+  if (tasksLoading) {
+    return (
+      <div className={cn(baseClassName, '*:h-8', className)}>
+        <Skeleton />
+        <Skeleton />
+        <Skeleton />
+      </div>
+    )
+  }
+
+  if (!tasks?.length) {
+    return (
+      <div className={cn(baseClassName, 'items-center gap-4', className)}>
+        <div>You don&apos;t have any tasks at the moment.</div>
+        <Button type="button" color="primary" aria-label="Create New Task">
+          <RocketIcon />
+          Create a New One!
+        </Button>
+      </div>
+    )
   }
 
   return (
-    <ul {...props}>
+    <ul className={cn(baseClassName, className)} {...props}>
       {tasks.map(task => (
         <li key={task._id}>{task.title}</li>
       ))}

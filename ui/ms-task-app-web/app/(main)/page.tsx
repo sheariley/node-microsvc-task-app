@@ -1,5 +1,4 @@
 import { auth } from '@/auth'
-import React from 'react'
 import { TaskList } from '../components/task-list/task-list'
 
 export default async function HomePage() {
@@ -7,18 +6,16 @@ export default async function HomePage() {
   const isAuthenticated = !!session?.user
   
   return (
-    <div className="container">
+    <div className="container flex flex-col items-center">
+      <div className="flex justify-center mb-8">
+        <h1 className="text-2xl">Welcome</h1>
+      </div>
       {!isAuthenticated ? (
         <>
-          {/* Placeholder content to be replaced */}
-          <h1>Landing Page</h1>
           <p>Please sign-in to get started.</p>
         </>
       ) : (
         <>
-          {/* Placeholder content to be replaced */}
-          <h1>Landing Page</h1>
-          <p>Thanks for signing in. Your tasks should be displayed below.</p>
           <TaskList userId={session.user!.id!} />
         </>
       )}
