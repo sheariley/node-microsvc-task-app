@@ -81,6 +81,7 @@ Build a task management app composed of containerized micro-services that allows
   - GET - `/api/ping` - Health check for container auto-restart
   - Landing page - `/` - List of tasks with ability to mark tasks as completed, delete tasks, navigate to task detail page
   - Task Detail Page - `/tasks/[taskId]` - Task detail page to view/edit a task
+    - If the value of the `taskId` route parameter is `new`, the page should allow the user to create a new task.
 - Source code paths
   - `@/public` - Static files to be copied to server upon deployment
   - `@/lib` - Low-level, shared utility methods and types
