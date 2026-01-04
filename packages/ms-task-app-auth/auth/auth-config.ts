@@ -18,13 +18,20 @@ export function getAuthConfig({
       strategy: 'jwt',
     },
     callbacks: {
+      async jwt({ token, user }) {
+        // 'user' is only available the first time the callback is called on signin
+        if (user) {
+          token.id = user.id;
+        }
+        return token;
+      },
       async session({ session, token }) {
-        if (token.sub) {
+        if (token?.id) {
           return {
             ...session,
             user: {
               ...session.user,
-              id: token.sub,
+              id: token.id as string,
             },
           }
         }
