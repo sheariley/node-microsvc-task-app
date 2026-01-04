@@ -7,6 +7,7 @@ Build a task management app composed of containerized micro-services that allows
 ## Architecture
 
 - Use node.js, Express, and Mongoose to create web API endpoints
+- Use RabbitMQ for message queuing
 - Use TypeScript for type-safety
 - Use zod for client and server user input validation
 - Use MongoDB for the database(s) backing the web APIs
@@ -14,20 +15,33 @@ Build a task management app composed of containerized micro-services that allows
   - Use docker-compose to orchestrate container pod and integrate the various individual containers
 - Authentication/Authorization: Use Auth.js (next-auth) to implement OAuth 2.0.
   - Create an API gateway within NextJS web UI for performing auth checks before accessing internal microservice APIs
+- Use mTLS to secure back-end communications
 
-## Shared DTO library/package
+## Shared Common Utilities library/package - ms-task-app-common
+
+- Provides common error types (HttpError, etc...)
+- Provides misc shared utility methods for things like error handling, async waiting, and service base-URL assembly
+- Provides a centralized configuration provider
+
+
+## Shared DTO library/package - ms-task-app-dto
 
 - Defines shared DTO schemas (zod) and types
 - Provides validation helper methods for validating DTO instances against zod schemas
 
-## Shared Entity library/package
+## Shared Entity library/package - ms-task-app-entities
 
 - Defines shared database entity types and schemas (zod, MongoDB/mongoose)
+
+## Shared Authentication/Authorization library/package - ms-task-app-auth
+
+- Provides shared auth related helpers and adapters
+- Provides shared mTLS helpers
 
 ## Shared Helper Methods and Types library/package
 
 - Provides shared helper methods for connecting to DB and message queue
-- Provides misc shared utility methods for things like error handling and async waiting
+- Provides common expressjs middleware used by multiple services (cache management, etc...)
 
 ## User Service
 
