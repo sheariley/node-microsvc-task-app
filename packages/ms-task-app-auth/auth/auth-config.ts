@@ -1,6 +1,7 @@
 import type { AuthConfig } from '@auth/core'
 import GitHub from '@auth/core/providers/github'
-import { RestAdapter, type CreateMtlsFetcherPathOptions } from 'ms-task-app-auth'
+import { type CreateMtlsFetcherPathOptions } from 'ms-task-app-mtls'
+import { RestAdapter } from './authjs-rest-adapter.ts'
 
 export type AuthConfigOptions = {
   authServiceUrl: string
@@ -21,9 +22,9 @@ export function getAuthConfig({
       async jwt({ token, user }) {
         // 'user' is only available the first time the callback is called on signin
         if (user) {
-          token.id = user.id;
+          token.id = user.id
         }
-        return token;
+        return token
       },
       async session({ session, token }) {
         if (token?.id) {

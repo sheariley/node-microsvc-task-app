@@ -6,7 +6,7 @@ import type {
   VerificationToken,
 } from '@auth/core/adapters'
 import { mapDtoValidationErrors, SessionInputDtoSchema } from 'ms-task-app-dto'
-import { createMtlsFetcher, type CreateMtlsFetcherPathOptions } from '../mtls/mtls-fetch.ts'
+import { createMtlsFetcher, type CreateMtlsFetcherPathOptions } from 'ms-task-app-mtls'
 
 export type RestAdapterOptions = {
   baseUrl: string,

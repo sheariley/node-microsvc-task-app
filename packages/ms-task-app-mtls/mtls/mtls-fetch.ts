@@ -1,6 +1,7 @@
 import fs from 'fs'
 import http from 'http'
 import https from 'https'
+import { httpResponseHasBody } from 'ms-task-app-common'
 
 export type CreateMtlsFetcherOptions = Pick<https.AgentOptions, 'key' | 'cert' | 'ca'>
 export type CreateMtlsFetcherPathOptions = {
@@ -21,8 +22,12 @@ function createMtlsFetcherOptions({
   }
 }
 
-export function createMtlsFetcher(options: CreateMtlsFetcherOptions | CreateMtlsFetcherPathOptions) {
-  const { key, cert, ca } = isCreateMtlsFetcherPathOptions(options) ? createMtlsFetcherOptions(options) : options
+export function createMtlsFetcher(
+  options: CreateMtlsFetcherOptions | CreateMtlsFetcherPathOptions
+) {
+  const { key, cert, ca } = isCreateMtlsFetcherPathOptions(options)
+    ? createMtlsFetcherOptions(options)
+    : options
 
   async function _fetch(url: string, requestInit: RequestInit) {
     const { body, ...requestOptions } = await requestInitToRequestOptions(requestInit)
@@ -42,9 +47,13 @@ export function createMtlsFetcher(options: CreateMtlsFetcherOptions | CreateMtls
       try {
         req.write(body)
       } catch (err) {
-        deferred.reject(new Error('Failed to write request body to outgoing request stream.', { cause: err }))
+        deferred.reject(
+          new Error('Failed to write request body to outgoing request stream.', { cause: err })
+        )
         // ensure request is cleaned up
-        try { req.destroy() } catch {}
+        try {
+          req.destroy()
+        } catch {}
         return deferred.promise
       }
     }
@@ -67,7 +76,6 @@ export function isCreateMtlsFetcherPathOptions(obj: unknown): obj is CreateMtlsF
     typeof (obj as any).caPath === 'string'
   )
 }
-
 
 type MtlsRequestOptions = Omit<https.RequestOptions, 'key' | 'cert' | 'ca'> & {
   /** Optional request body prepared as a Buffer for writing to the socket */
@@ -160,26 +168,28 @@ function incomingMessageToResponse(msg: http.IncomingMessage): Response {
 
   // Convert Node's IncomingMessage (a Node Readable stream) into a
   // Web ReadableStream<Uint8Array> so `Response` accepts it correctly.
-  const body = new ReadableStream<Uint8Array>({
-    start(controller) {
-      msg.on('data', (chunk: Buffer | string | Uint8Array) => {
-        if (typeof chunk === 'string') {
-          controller.enqueue(new TextEncoder().encode(chunk))
-        } else if (Buffer.isBuffer(chunk)) {
-          controller.enqueue(new Uint8Array(chunk))
-        } else {
-          controller.enqueue(new Uint8Array(chunk))
-        }
-      })
+  const body = !httpResponseHasBody(status, msg.method)
+    ? null
+    : new ReadableStream<Uint8Array>({
+        start(controller) {
+          msg.on('data', (chunk: Buffer | string | Uint8Array) => {
+            if (typeof chunk === 'string') {
+              controller.enqueue(new TextEncoder().encode(chunk))
+            } else if (Buffer.isBuffer(chunk)) {
+              controller.enqueue(new Uint8Array(chunk))
+            } else {
+              controller.enqueue(new Uint8Array(chunk))
+            }
+          })
 
-      msg.on('end', () => controller.close())
-      msg.on('error', err => controller.error(err))
-    },
-    cancel() {
-      // If the consumer cancels, destroy the underlying Node stream.
-      if (typeof msg.destroy === 'function') msg.destroy()
-    },
-  })
+          msg.on('end', () => controller.close())
+          msg.on('error', err => controller.error(err))
+        },
+        cancel() {
+          // If the consumer cancels, destroy the underlying Node stream.
+          if (typeof msg.destroy === 'function') msg.destroy()
+        },
+      })
 
   return new Response(body, { status, statusText, headers })
 }
@@ -210,7 +220,7 @@ async function formDataToBuffer(fd: FormData): Promise<{ buffer: Buffer; content
   const parts: Buffer[] = []
 
   const append = (s: string) => parts.push(Buffer.from(s))
-  const formDataMap = new Map<string, FormDataEntryValue>()
+  const formDataMap = new Map<string, string | File>()
   fd.forEach((value, key) => formDataMap.set(key, value))
 
   for (const [name, value] of formDataMap) {

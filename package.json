@@ -7,6 +7,7 @@
     "format": "prettier --write .",
     "check-format": "prettier --check .",
     "build:common": "npm run build --workspace=packages/ms-task-app-common",
+    "build:mtls": "npm run build --workspace=packages/ms-task-app-mtls",
     "build:auth": "npm run build --workspace=packages/ms-task-app-auth",
     "build:service-util": "npm run build --workspace=packages/ms-task-app-service-util",
     "build:dto": "npm run build --workspace=packages/ms-task-app-dto",

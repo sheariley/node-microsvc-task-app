@@ -2,19 +2,21 @@
 
 import { Button, Checkbox, Form, Input, Textarea, addToast } from '@/app/components/ui'
 import { useTaskServiceClient } from '@/lib/api-clients/task-service-client'
+import { cn } from '@/lib/ui-helpers'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { OctagonAlertIcon, ThumbsUpIcon } from 'lucide-react'
+import { OctagonAlertIcon, SaveIcon, ThumbsUpIcon, XIcon } from 'lucide-react'
 import { coalesceErrorMsg } from 'ms-task-app-common'
 import { TaskDto, TaskInputDto, TaskInputDtoSchema, isTaskDto } from 'ms-task-app-dto'
 import { useRouter } from 'next/navigation'
+import React from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
-type Props = {
+type Props = React.ComponentProps<typeof Form> & {
   task: TaskDto | TaskInputDto
   userId: string
 }
 
-export default function TaskEditForm({ task, userId }: Props) {
+export default function TaskEditForm({ task, userId, className, ...formProps }: Props) {
   const router = useRouter()
   const taskClient = useTaskServiceClient()
 
@@ -64,7 +66,11 @@ export default function TaskEditForm({ task, userId }: Props) {
   }
 
   return (
-    <Form onSubmit={handleSubmit(onSubmit)} className="flex max-w-2xl flex-col items-stretch">
+    <Form
+      {...formProps}
+      onSubmit={handleSubmit(onSubmit)}
+      className={cn('flex w-full max-w-2xl flex-col items-stretch', className)}
+    >
       <div className="mb-4">
         <Controller
           name="title"
@@ -86,6 +92,7 @@ export default function TaskEditForm({ task, userId }: Props) {
                 validationBehavior="aria"
                 isInvalid={invalid}
                 errorMessage={() => error?.message}
+                disabled={isSubmitting}
               />
             </>
           )}
@@ -113,6 +120,7 @@ export default function TaskEditForm({ task, userId }: Props) {
                 validationBehavior="aria"
                 isInvalid={invalid}
                 errorMessage={() => error?.message}
+                disabled={isSubmitting}
               />
             </>
           )}
@@ -124,7 +132,7 @@ export default function TaskEditForm({ task, userId }: Props) {
           name="completed"
           control={control}
           render={({ field }) => (
-            <Checkbox checked={!!field.value} onChange={field.onChange}>
+            <Checkbox checked={!!field.value} onChange={field.onChange} disabled={isSubmitting}>
               Completed
             </Checkbox>
           )}
@@ -133,10 +141,10 @@ export default function TaskEditForm({ task, userId }: Props) {
 
       <div className="flex justify-end gap-2">
         <Button type="submit" color="primary" disabled={isSubmitting}>
-          Save
+          <SaveIcon size="20" /> Save
         </Button>
         <Button type="button" variant="flat" onPress={() => router.push('/')}>
-          Cancel
+          <XIcon size="20" /> Cancel
         </Button>
       </div>
     </Form>

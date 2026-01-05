@@ -18,6 +18,7 @@ export const TaskInputDtoSchema = z.object({
 
 export const TaskDtoSchema = z.object({
   _id: z.string(),
+  userId: z.string(),
   ...TaskInputDtoSchema.shape,
 })
 

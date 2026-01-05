@@ -18,6 +18,9 @@ COPY ./packages/ms-task-app-dto/package.json ./packages/ms-task-app-dto/
 # Copy entities package.json file
 COPY ./packages/ms-task-app-entities/package.json ./packages/ms-task-app-entities/
 
+# Copy mTLS package.json file
+COPY ./packages/ms-task-app-mtls/package.json ./packages/ms-task-app-mtls/
+
 # Copy auth package.json file
 COPY ./packages/ms-task-app-auth/package.json ./packages/ms-task-app-auth/
 
@@ -46,6 +49,9 @@ COPY ./packages/ms-task-app-dto ./packages/ms-task-app-dto/
 # Copy entities package source code
 COPY ./packages/ms-task-app-entities ./packages/ms-task-app-entities/
 
+# Copy mTLS package source code
+COPY ./packages/ms-task-app-mtls ./packages/ms-task-app-mtls/
+
 # Copy auth package source code
 COPY ./packages/ms-task-app-auth ./packages/ms-task-app-auth/
 
@@ -60,6 +66,9 @@ RUN npm run build:dto
 
 # Build the entities package 
 RUN npm run build:entities
+
+# Build the mTLS package
+RUN npm run build:mtls
 
 # Build the auth package
 RUN npm run build:auth
@@ -78,6 +87,7 @@ WORKDIR /app
 COPY --from=build_base /repo/packages/ms-task-app-common ./packages/ms-task-app-common
 COPY --from=build_base /repo/packages/ms-task-app-dto ./packages/ms-task-app-dto
 COPY --from=build_base /repo/packages/ms-task-app-entities ./packages/ms-task-app-entities
+COPY --from=build_base /repo/packages/ms-task-app-mtls ./packages/ms-task-app-mtls
 COPY --from=build_base /repo/packages/ms-task-app-auth ./packages/ms-task-app-auth
 COPY --from=build_base /repo/packages/ms-task-app-service-util ./packages/ms-task-app-service-util
 

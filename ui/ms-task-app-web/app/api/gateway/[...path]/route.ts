@@ -2,12 +2,21 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { auth } from '@/auth'
-import { createGatewayServiceResolver, excludeHopByHopHeaders, setXForwardedHeaders } from '@/lib/api-routing'
-import { coalesceErrorMsg, getServerConfig, HttpError } from 'ms-task-app-common'
-import { NextResponse } from 'next/server'
-import { createMtlsFetcher } from 'ms-task-app-auth'
-import { serviceRoutes } from './service-routes'
+import {
+  createGatewayServiceResolver,
+  excludeHopByHopHeaders,
+  setXForwardedHeaders,
+} from '@/lib/api-routing'
+import {
+  coalesceErrorMsg,
+  getServerConfig,
+  HttpError,
+  httpResponseHasBody,
+} from 'ms-task-app-common'
+import { createMtlsFetcher } from 'ms-task-app-mtls'
 import { headers } from 'next/headers'
+import { NextResponse } from 'next/server'
+import { serviceRoutes } from './service-routes'
 
 let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
 
@@ -68,7 +77,10 @@ const proxyRequest = auth(async req => {
   })
 
   const respHeaders = excludeHopByHopHeaders(serviceResponse.headers)
-  const respArrayBuffer = await serviceResponse.arrayBuffer()
+
+  const respArrayBuffer = !httpResponseHasBody(serviceResponse.status, req.method)
+    ? null
+    : await serviceResponse.arrayBuffer()
 
   return new NextResponse(respArrayBuffer, {
     status: serviceResponse.status,

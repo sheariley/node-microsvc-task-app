@@ -36,7 +36,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
   }
 
   return (
-    <div className="container">
+    <div className="container flex flex-col items-center">
       {fetchError ? (
         <div className="my-3">
           <Alert color="danger" title={fetchError} />

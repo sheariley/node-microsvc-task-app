@@ -1,3 +1,4 @@
+import { httpResponseHasBody } from 'ms-task-app-common'
 import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
 import React from 'react'
 
@@ -39,6 +40,7 @@ export type TaskServiceClient = {
 
 function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceClient {
   async function request<T>(path: string, opt?: ApiRequestOptionsWithBody) {
+    const method = opt?.method || 'GET'
     const outHeaders: Record<string, string> = {
       ...headers,
       ...opt?.headers,
@@ -55,7 +57,9 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
     })
 
     let body: T | null = null
-    body = await res.json()
+    if (httpResponseHasBody(res.status, method)) {
+      body = await res.json()
+    }
 
     if (!res.ok) {
       const msg = isApiErrorResponse(body) ? body.message : res.statusText || 'API error'

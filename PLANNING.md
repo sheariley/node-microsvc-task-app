@@ -75,6 +75,7 @@ Build a task management app composed of containerized micro-services that allows
   - HeroUI V2: Low-level UI components
   - TailwindCSS - Styling and theming
   - SWR - Async data fetching/streaming
+  - lucide-react - For displaying icons
 - Architectural guidelines
   - Maximize usage of server-side rendering
   - Maximize usage of SWR for fetching data and async state management in client-side components
@@ -83,6 +84,7 @@ Build a task management app composed of containerized micro-services that allows
 - Styling
   - Simple and clean, but still polished and easy on the eyes
   - 1 light and 1 dark theme; defaulting to system preference
+  - Use the lucide-react package for displaying icons
 - Routes
   - GET - `/api/ping` - Health check for container auto-restart
   - Landing page - `/` - List of tasks with ability to mark tasks as completed, delete tasks, navigate to task detail page
