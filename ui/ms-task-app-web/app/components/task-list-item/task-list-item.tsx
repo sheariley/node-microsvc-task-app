@@ -1,70 +1,49 @@
-import { toggleTaskComplete } from '@/server-actions/toggle-task-complete'
+import { Button, Link, Spinner } from '@/app/components/ui'
+import { cn } from '@/lib/ui-helpers'
+import { CheckIcon } from 'lucide-react'
 import { TaskDto } from 'ms-task-app-dto'
 import React from 'react'
-import { addToast, Button, Link, Spinner } from '@/app/components/ui'
-import { cn } from '@/lib/ui-helpers'
-import { CheckIcon, OctagonAlertIcon, ThumbsUpIcon } from 'lucide-react'
-import { coalesceErrorMsg } from 'ms-task-app-common'
 
-export type TaskListItemProps = {
+export type TaskListItemProps = React.ComponentProps<'div'> & {
   task: TaskDto
+  disabled?: boolean
+  togglingCompleted?: boolean
+  onToggleCompleted: () => unknown
 }
 
-export function TaskListItem({task}: TaskListItemProps) {
-  const [togglingCompleted, startToggleCompleted] = React.useTransition()
-  
-  const handleToggleCompleted = React.useCallback(() => {
-    startToggleCompleted(async () => {
-      try {
-        await toggleTaskComplete(task)
-        addToast({
-          color: 'success',
-          icon: <ThumbsUpIcon />,
-          title: !task.completed ? 'Task marked as completed' : 'Task marked as incomplete'
-        })
-      } catch (error) {
-        const description = coalesceErrorMsg(error)
-        addToast({
-          color: 'danger',
-          icon: <OctagonAlertIcon />,
-          title: !task.completed ? 'Failed to mark task as completed' : 'Failed to mark task as incomplete',
-          description
-        })
-      }
-    })
-  }, [task, startToggleCompleted])
+export function TaskListItem({ task, togglingCompleted, onToggleCompleted, disabled = false, className, ...props }: TaskListItemProps) {
+  const toggleCompleteButtonHelpText = task.completed
+    ? 'Completed (press to mark as incomplete)'
+    : 'Not completed (press to mark as completed)'
 
   return (
-    <li className="flex items-center gap-3 rounded-md p-2 select-none">
-      <Button
-        type="button"
-        aria-label={task.completed ? 'Completed' : 'Not completed'}
-        size="sm"
-        variant="ghost"
-        color={task.completed && !togglingCompleted ? 'success' : 'default'}
-        className={cn(
-          'flex h-8 w-8 min-w-8 shrink-0 items-center justify-center',
-          task.completed ? 'text-success' : 'text-primary'
-        )}
-        isIconOnly
-        disabled={togglingCompleted}
-        onPress={handleToggleCompleted}
-      >
-        {togglingCompleted ? (
-          <Spinner size="sm" />
-        ) : (
-          task.completed && <CheckIcon size="20" />
-        )}
-      </Button>
-
+    <div {...props} className={cn('flex items-center gap-3 overflow-hidden select-none', className)}>
       <Link
         href={`/tasks/${task._id}`}
-        title={task.description || undefined}
-        isDisabled={togglingCompleted}
-        className="text-foreground cursor-pointer truncate hover:underline"
+        title={`${task.title}\n${task.description}` || undefined}
+        isDisabled={disabled || togglingCompleted}
+        className={cn('text-foreground leading-none flex-1 cursor-pointer truncate', {
+          'text-neutral-500': disabled,
+          'line-through': task.completed,
+        })}
       >
         {task.title}
       </Link>
-    </li>
+
+      <Button
+        type="button"
+        isIconOnly
+        aria-label={toggleCompleteButtonHelpText}
+        title={toggleCompleteButtonHelpText}
+        size="sm"
+        variant="solid"
+        color={!togglingCompleted && task.completed ? 'success' : 'secondary'}
+        className="flex size-6 min-w-6 shrink-0 items-center justify-center"
+        isDisabled={disabled || togglingCompleted}
+        onPress={() => onToggleCompleted()}
+      >
+        {togglingCompleted ? <Spinner size="sm" /> : task.completed && <CheckIcon size="16" />}
+      </Button>
+    </div>
   )
 }

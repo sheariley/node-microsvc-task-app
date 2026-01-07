@@ -69,23 +69,34 @@ const proxyRequest = auth(async req => {
     }
   }
 
-  const serviceResponse = await _fetch(targetUri, {
-    method: req.method,
-    headers: outHeaders,
-    body: body && body.byteLength ? body : undefined,
-    redirect: 'manual',
-  })
-
-  const respHeaders = excludeHopByHopHeaders(serviceResponse.headers)
-
-  const respArrayBuffer = !httpResponseHasBody(serviceResponse.status, req.method)
-    ? null
-    : await serviceResponse.arrayBuffer()
-
-  return new NextResponse(respArrayBuffer, {
-    status: serviceResponse.status,
-    headers: respHeaders,
-  })
+  try {
+    let serviceResponse: Response | undefined
+    try {
+      serviceResponse = await _fetch(targetUri, {
+        method: req.method,
+        headers: outHeaders,
+        body: body && body.byteLength ? body : undefined,
+        redirect: 'manual',
+      })
+    } catch (cause) {
+      throw new HttpError('Service unreachable', 503, { cause })
+    }
+  
+    const respHeaders = excludeHopByHopHeaders(serviceResponse.headers)
+  
+    const respArrayBuffer = !serviceResponse.body || !httpResponseHasBody(serviceResponse.status, req.method)
+      ? null
+      : await serviceResponse.arrayBuffer()
+      
+    return new NextResponse(respArrayBuffer, {
+      status: serviceResponse.status,
+      headers: respHeaders,
+    })
+  } catch (err) {
+    const message = coalesceErrorMsg(err, 'Internal Server Error')
+    const status = err instanceof HttpError ? err.status : 500
+    return NextResponse.json({ error: true, message }, { status })
+  }
 })
 
 export const GET = proxyRequest

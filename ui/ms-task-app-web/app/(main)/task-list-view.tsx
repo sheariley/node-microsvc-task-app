@@ -23,5 +23,5 @@ export async function TaskListView({ userId }: TaskListViewProps) {
     )
   }
 
-  return <TaskList tasks={tasks} />
+  return <TaskList userId={userId} tasks={tasks} />
 }

@@ -11,12 +11,14 @@ import { useRouter } from 'next/navigation'
 import React from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
-type Props = React.ComponentProps<typeof Form> & {
-  task: TaskDto | TaskInputDto
+type Props = Omit<React.ComponentProps<typeof Form>, 'onSubmit' | 'onSubmitted'> & {
+  task?: TaskDto | TaskInputDto
   userId: string
+  inline?: boolean
+  onSubmitted?: (task: TaskDto | TaskInputDto) => void | Promise<void>
 }
 
-export default function TaskEditForm({ task, userId, className, ...formProps }: Props) {
+export default function TaskEditForm({ task, userId, inline, onSubmitted, className, ...formProps }: Props) {
   const router = useRouter()
   const taskClient = useTaskServiceClient()
 
@@ -24,19 +26,20 @@ export default function TaskEditForm({ task, userId, className, ...formProps }: 
     control,
     handleSubmit,
     formState: { isSubmitting },
+    reset: resetForm,
   } = useForm<TaskInputDto>({
     mode: 'all',
     resolver: zodResolver(TaskInputDtoSchema),
     defaultValues: {
-      title: task.title ?? '',
-      description: task.description ?? undefined,
-      completed: !!task.completed,
+      title: task?.title ?? '',
+      description: task?.description ?? undefined,
+      completed: !!task?.completed,
     },
   })
 
   async function onSubmit(data: TaskInputDto) {
     try {
-      const id = isTaskDto(task) ? task._id : undefined
+      const id = !!task && isTaskDto(task) ? task._id : undefined
 
       if (id) {
         await taskClient.updateTask(userId, id, data)
@@ -45,6 +48,7 @@ export default function TaskEditForm({ task, userId, className, ...formProps }: 
           icon: <ThumbsUpIcon />,
           color: 'success',
         })
+        if (onSubmitted) onSubmitted({ ...task, ...data })
       } else {
         const newTask = await taskClient.createTask(userId, data)
         addToast({
@@ -52,7 +56,12 @@ export default function TaskEditForm({ task, userId, className, ...formProps }: 
           icon: <ThumbsUpIcon />,
           color: 'success',
         })
-        router.replace(`/tasks/${newTask._id}`)
+        if (onSubmitted) onSubmitted({ ...task, ...data })
+        if (!inline) {
+          router.replace(`/tasks/${newTask._id}`)
+        } else {
+          resetForm()
+        }
       }
     } catch (err) {
       console.error('Failed to save task', err)
@@ -69,84 +78,124 @@ export default function TaskEditForm({ task, userId, className, ...formProps }: 
     <Form
       {...formProps}
       onSubmit={handleSubmit(onSubmit)}
-      className={cn('flex w-full max-w-2xl flex-col items-stretch', className)}
+      className={cn(
+        'flex w-full items-stretch',
+        {
+          'max-w-2xl': !inline,
+          'flex-row': inline,
+        },
+        className
+      )}
     >
-      <div className="mb-4">
-        <Controller
-          name="title"
-          control={control}
-          render={({
-            field: { name, value, onChange, onBlur, ref },
-            fieldState: { invalid, error },
-          }) => (
-            <>
-              <Input
-                ref={ref}
-                isRequired
-                name={name}
-                value={value}
-                onBlur={onBlur}
-                onChange={onChange}
-                label="Title"
-                placeholder="Enter title"
-                validationBehavior="aria"
-                isInvalid={invalid}
-                errorMessage={() => error?.message}
+      <Controller
+        name="title"
+        control={control}
+        render={({
+          field: { name, value, onChange, onBlur, ref },
+          fieldState: { invalid, error },
+        }) => (
+          <>
+            <Input
+              className={cn({ 'inline-block': inline, 'mb-4': !inline })}
+              ref={ref}
+              isRequired
+              name={name}
+              value={value}
+              onBlur={onBlur}
+              onChange={onChange}
+              label={!inline ? 'Title' : undefined}
+              placeholder={inline ? 'New task title' : 'Enter title'}
+              size={inline ? 'lg' : undefined}
+              validationBehavior="aria"
+              isInvalid={invalid}
+              errorMessage={() => error?.message}
+              disabled={isSubmitting}
+              endContent={
+                !inline ? undefined : (<>
+                  <Button
+                    type="button"
+                    className="mr-2 text-neutral-400 hover:text-foreground hover:bg-content2"
+                    color="default"
+                    variant="flat"
+                    size="sm"
+                    isIconOnly
+                    title="Clear"
+                    onPress={() => resetForm()}
+                  >
+                    <XIcon />
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    color="primary"
+                    disabled={isSubmitting}
+                    size="sm"
+                    className="px-0 gap-0 sm:px-3 sm:gap-2 sm:[&>svg]:max-w-8"
+                  >
+                    <SaveIcon size="20" />
+                    <span className="hidden sm:inline"> Save</span>
+                  </Button>
+                </>)
+              }
+            />
+          </>
+        )}
+      />
+
+      {!inline && (
+        <>
+          <Controller
+            name="description"
+            control={control}
+            render={({
+              field: { name, value, onChange, onBlur, ref },
+              fieldState: { invalid, error },
+            }) => (
+              <>
+                <Textarea
+                  className="mb-4"
+                  ref={ref}
+                  name={name}
+                  value={value}
+                  onBlur={onBlur}
+                  onChange={onChange}
+                  label="Description"
+                  rows={6}
+                  placeholder="Optional description"
+                  validationBehavior="aria"
+                  isInvalid={invalid}
+                  errorMessage={() => error?.message}
+                  disabled={isSubmitting}
+                />
+              </>
+            )}
+          />
+
+          <Controller
+            name="completed"
+            control={control}
+            render={({ field }) => (
+              <Checkbox
+                className="mb-4"
+                checked={!!field.value}
+                onChange={field.onChange}
                 disabled={isSubmitting}
-              />
-            </>
-          )}
-        />
-      </div>
+              >
+                Completed
+              </Checkbox>
+            )}
+          />
 
-      <div className="mb-4">
-        <Controller
-          name="description"
-          control={control}
-          render={({
-            field: { name, value, onChange, onBlur, ref },
-            fieldState: { invalid, error },
-          }) => (
-            <>
-              <Textarea
-                ref={ref}
-                name={name}
-                value={value}
-                onBlur={onBlur}
-                onChange={onChange}
-                label="Description"
-                rows={6}
-                placeholder="Optional description"
-                validationBehavior="aria"
-                isInvalid={invalid}
-                errorMessage={() => error?.message}
-                disabled={isSubmitting}
-              />
-            </>
-          )}
-        />
-      </div>
-
-      <div className="mb-4">
-        <Controller
-          name="completed"
-          control={control}
-          render={({ field }) => (
-            <Checkbox checked={!!field.value} onChange={field.onChange} disabled={isSubmitting}>
-              Completed
-            </Checkbox>
-          )}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button type="submit" color="primary" disabled={isSubmitting}>
-          <SaveIcon size="20" /> Save
-        </Button>
-        <Button type="button" variant="flat" onPress={() => router.push('/')}>
-          <XIcon size="20" /> Cancel
-        </Button>
-      </div>
+          <div className="flex justify-end gap-2">
+            <Button type="submit" color="primary" disabled={isSubmitting}>
+              <SaveIcon size="20" /> Save
+            </Button>
+            <Button type="button" variant="flat" onPress={() => router.push('/')}>
+              <XIcon size="20" /> Cancel
+            </Button>
+          </div>
+        </>
+      )}
     </Form>
   )
 }

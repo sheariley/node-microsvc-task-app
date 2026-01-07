@@ -1,22 +1,24 @@
 import { getSession, type Session } from '@auth/express'
 import type { NextFunction, Request, Response } from 'express'
 import { getAuthConfig } from 'ms-task-app-auth'
-import type { Locals } from './express-types.ts'
 import { getServerConfig, getServiceBaseUrl } from 'ms-task-app-common'
+import type { Locals } from './express-types.ts'
 
 const serverEnv = getServerConfig()
 const authServiceUrl = getServiceBaseUrl({
   host: serverEnv.oauthSvc.host,
   port: serverEnv.oauthSvc.port,
-  secure: !serverEnv.disableInternalMtls
+  secure: !serverEnv.disableInternalMtls,
 })
 const authConfig = getAuthConfig({
   authServiceUrl,
-  mtlsFetcherOptions: serverEnv.disableInternalMtls ? undefined : {
-    keyPath: serverEnv.taskSvc.privateKeyPath,
-    certPath: serverEnv.taskSvc.certPath,
-    caPath: serverEnv.taskSvc.caCertPath,
-  }
+  mtlsFetcherOptions: serverEnv.disableInternalMtls
+    ? undefined
+    : {
+        keyPath: serverEnv.taskSvc.privateKeyPath,
+        certPath: serverEnv.taskSvc.certPath,
+        caPath: serverEnv.taskSvc.caCertPath,
+      },
 })
 
 export async function authenticatedUser(

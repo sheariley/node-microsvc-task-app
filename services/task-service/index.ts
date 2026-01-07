@@ -1,5 +1,6 @@
 import bodyParser from 'body-parser'
-import express from 'express'
+import express, { type RequestHandler } from 'express'
+import type { Query } from 'express-serve-static-core'
 import fs from 'fs'
 import https from 'https'
 import mongoose from 'mongoose'
@@ -13,9 +14,11 @@ import {
   connectMQWithRetry,
   disableResponseCaching,
   type TaskCreatedQueueMessage,
-  type TaskUpdatedQueueMessage,
+  type TaskUpdatedQueueMessage
 } from 'ms-task-app-service-util'
 import { authenticatedUser } from './lib/authenticated-user.ts'
+import type { BulkOpLocals, Locals } from './lib/express-types.ts'
+import { validBulkOpParams } from './lib/valid-bulk-op-params.ts'
 
 // Server settings
 const servicePort = 3002
@@ -90,7 +93,7 @@ async function main() {
       })
     )
   }
-
+  
   // used for container health-check
   app.get('/ping', async (req, res) => {
     res.status(200).json({ timestamp: Date.now() })
@@ -122,7 +125,7 @@ async function main() {
     try {
       // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
       if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
-        return res.status(404)
+        return res.status(404).send()
       }
 
       if (req.params.userId !== res.locals.user?.id) {
@@ -149,7 +152,7 @@ async function main() {
 
     // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
     if (!mongoose.isValidObjectId(req.params.userId)) {
-      return res.status(404)
+      return res.status(404).send()
     }
 
     if (req.params.userId !== res.locals.user?.id) {
@@ -193,13 +196,62 @@ async function main() {
     }
   })
 
+  const bulkUpdateCompleted = (
+    completed: boolean
+  ): RequestHandler<{ userId: string }, any, any, Query, Locals & BulkOpLocals> => {
+    return async (req, res) => {
+      const { userId } = req.params
+
+      // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+      if (!mongoose.isValidObjectId(userId)) {
+        return res.status(404).send()
+      }
+
+      if (req.params.userId !== res.locals.user?.id) {
+        return res.status(403).json({ error: true, message: 'Unauthorized' })
+      }
+
+      const { matchedCount, modifiedCount } = await TaskModel.updateMany(
+        {
+          userId,
+          _id: res.locals.taskIds,
+        },
+        {
+          $set: { completed },
+        }
+      )
+
+      if (!matchedCount) {
+        return res.status(404).json({ error: true, message: 'Task(s) not found' })
+      }
+
+      res.status(200).json({ matchedCount, modifiedCount })
+    }
+  }
+
+  // Mark multiple tasks complete for a user
+  app.put(
+    '/users/:userId/tasks/complete',
+    authenticatedUser,
+    validBulkOpParams,
+    bulkUpdateCompleted(true)
+  )
+
+  // Mark multiple tasks incomplete for a user
+  app.put(
+    '/users/:userId/tasks/uncomplete',
+    authenticatedUser,
+    validBulkOpParams,
+    bulkUpdateCompleted(false)
+  )
+
   // Update a task for a user
   app.put('/users/:userId/tasks/:taskId', authenticatedUser, async (req, res) => {
     const { taskId, userId } = req.params
 
     // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
     if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
-      return res.status(404)
+      return res.status(404).send()
     }
 
     if (req.params.userId !== res.locals.user?.id) {
@@ -261,7 +313,7 @@ async function main() {
 
     // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
     if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(taskId)) {
-      return res.status(404)
+      return res.status(404).send()
     }
 
     if (req.params.userId !== res.locals.user?.id) {
@@ -277,6 +329,37 @@ async function main() {
     res.status(204).send()
   })
 
+  // Delete multiple tasks for a user
+  app.delete('/users/:userId/tasks', authenticatedUser, validBulkOpParams, async (req, res) => {
+    const { userId } = req.params
+
+    // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(404).send()
+    }
+
+    if (req.params.userId !== res.locals.user?.id) {
+      return res.status(403).json({ error: true, message: 'Unauthorized' })
+    }
+
+    const deleteResult = await TaskModel.deleteMany({
+      userId,
+      _id: res.locals.taskIds,
+    })
+
+    if (!deleteResult.deletedCount) {
+      return res.status(404).json({ error: true, message: 'Task(s) not found' })
+    }
+
+    res.status(200).json({ deletedCount: deleteResult.deletedCount })
+  })
+
+  // Not found 
+  app.use((req, res) => {
+    res.status(404).json({ error: true, message: 'Not found' })
+  })
+
+  // Start listening
   if (serverEnv.disableInternalMtls) {
     app.listen(servicePort, () => {
       console.log(`Task service listening on unsecure port ${servicePort}`)

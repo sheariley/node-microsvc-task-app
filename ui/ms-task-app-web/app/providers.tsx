@@ -16,7 +16,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionProvider>
-      <NextThemesProvider attribute="class" defaultTheme="dark">
+      <NextThemesProvider attribute="class">
         <HeroUIProvider navigate={router.push}>
           <ToastProvider />
           {children}

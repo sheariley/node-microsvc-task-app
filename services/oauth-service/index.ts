@@ -27,7 +27,7 @@ import {
 import {
   connectMQWithRetry,
   disableResponseCaching,
-  type AccountLinkedQueueMessage,
+  type AccountLinkedQueueMessage
 } from 'ms-task-app-service-util'
 import * as z from 'zod'
 
@@ -483,6 +483,11 @@ async function main() {
       const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
+  })
+
+  // Not found 
+  app.use((req, res) => {
+    res.status(404).json({ error: true, message: 'Not found' })
   })
 
   if (serverEnv.disableInternalMtls) {

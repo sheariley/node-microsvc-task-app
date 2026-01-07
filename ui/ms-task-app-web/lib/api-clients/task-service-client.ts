@@ -1,32 +1,7 @@
 import { httpResponseHasBody } from 'ms-task-app-common'
 import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
 import React from 'react'
-
-type ApiErrorResponse = {
-  error: true
-  message: string
-}
-
-class ApiError extends Error {
-  status: number
-  details?: Record<string, unknown>
-
-  constructor(message: string, status: number, details?: Record<string, unknown>) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-    this.details = details
-  }
-}
-
-type ApiRequestOptions = {
-  method?: string
-  headers?: Record<string, string>
-}
-
-type ApiRequestOptionsWithBody = ApiRequestOptions & {
-  body?: string
-}
+import { ApiError, ApiRequestOptionsWithBody, isApiErrorResponse } from './api-result-types'
 
 const GATEWAY_BASE = '/api/gateway'
 
@@ -36,15 +11,22 @@ export type TaskServiceClient = {
   createTask(userId: string, input: TaskInputDto): Promise<TaskDto>
   updateTask(userId: string, taskId: string, input: Partial<TaskInputDto>): Promise<void>
   deleteTask(userId: string, taskId: string): Promise<void>
+  deleteTasks(userId: string, taskIds: string[]): Promise<{ deleteCount: number }>
+  completeTasks(userId: string, taskIds: string[]): Promise<{ matchedCount: number, modifiedCount: number }>
+  uncompleteTasks(userId: string, taskIds: string[]): Promise<{ matchedCount: number, modifiedCount: number }>
 }
 
 function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceClient {
-  async function request<T>(path: string, opt?: ApiRequestOptionsWithBody) {
+  async function request<T = void>(path: string, opt?: ApiRequestOptionsWithBody): Promise<T> {
     const method = opt?.method || 'GET'
     const outHeaders: Record<string, string> = {
       ...headers,
       ...opt?.headers,
+      ...(!opt?.body ? {} : {
+        'content-type': 'application/json',
+      })
     }
+    // Use absolute URL for server-side fetch
     let baseUrl = GATEWAY_BASE
     if (outHeaders.host && outHeaders['x-forwarded-proto']) {
       baseUrl = `${outHeaders['x-forwarded-proto']}://${outHeaders.host}${GATEWAY_BASE}`
@@ -52,12 +34,13 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
     const url = `${baseUrl}${path}`
     const res = await fetch(url, {
       credentials: 'include',
-      ...opt,
+      method,
       headers: outHeaders,
+      body: !opt?.body ? undefined : JSON.stringify(opt.body)
     })
 
     let body: T | null = null
-    if (httpResponseHasBody(res.status, method)) {
+    if (res.body !== null && httpResponseHasBody(res.status, method)) {
       body = await res.json()
     }
 
@@ -66,49 +49,62 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
       throw new ApiError(msg, res.status, { response: body })
     }
 
-    return body
+    return body as T
   }
 
   return {
     async getUserTasks(userId: string) {
-      return (await request(`/users/${encodeURIComponent(userId)}/tasks`, {
+      return (await request<TaskDto[]>(`/users/${encodeURIComponent(userId)}/tasks`, {
         method: 'GET',
-      })) as TaskDto[]
+      }))
     },
 
     async getUserTaskById(userId: string, taskId: string) {
-      return (await request(
+      return (await request<TaskDto>(
         `/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`,
         { method: 'GET' }
-      )) as TaskDto
+      ))
     },
 
     async createTask(userId: string, input: TaskInputDto) {
-      return (await request(`/users/${encodeURIComponent(userId)}/tasks`, {
+      return (await request<TaskDto>(`/users/${encodeURIComponent(userId)}/tasks`, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      })) as TaskDto
+        body: input,
+      }))
     },
 
     async updateTask(userId: string, taskId: string, input: Partial<TaskInputDto>) {
       await request(`/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`, {
         method: 'PUT',
-        headers: {
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify(input),
+        body: input,
       })
-      return
     },
 
     async deleteTask(userId: string, taskId: string) {
       await request(`/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`, {
         method: 'DELETE',
       })
-      return
+    },
+
+    async deleteTasks(userId: string, taskIds: string[]) {
+      return await request<{ deleteCount: number }>(`/users/${encodeURIComponent(userId)}/tasks`, {
+        method: 'DELETE',
+        body: taskIds
+      })
+    },
+
+    async completeTasks(userId: string, taskIds: string[]) {
+      return await request<{ matchedCount: number, modifiedCount: number }>(`/users/${encodeURIComponent(userId)}/tasks/complete`, {
+        method: 'PUT',
+        body: taskIds
+      })
+    },
+
+    async uncompleteTasks(userId: string, taskIds: string[]) {
+      return await request<{ matchedCount: number, modifiedCount: number }>(`/users/${encodeURIComponent(userId)}/tasks/uncomplete`, {
+        method: 'PUT',
+        body: taskIds
+      })
     },
   }
 }
@@ -121,10 +117,3 @@ export function useTaskServiceClient() {
   const client = React.useMemo(() => makeTaskServiceClient(), [])
   return client
 }
-
-function isApiErrorResponse(obj: unknown): obj is ApiErrorResponse {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return !!obj && (obj as any).error === true && typeof (obj as any).message === 'string'
-}
-
-export type { ApiError }

@@ -4,3 +4,7 @@ export type Locals = {
   session?: Session,
   user?: User
 }
+
+export type BulkOpLocals = {
+  taskIds: string[]
+}

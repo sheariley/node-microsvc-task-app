@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark" style={{ colorScheme: 'dark' }}>
+    <html lang="en" suppressHydrationWarning>
       <body className={cn('flex flex-col min-h-screen w-full items-stretch justify-start antialiased', geistSans.variable, geistMono.variable)}>
         <Providers>{children}</Providers>
       </body>
