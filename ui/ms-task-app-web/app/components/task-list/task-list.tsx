@@ -8,9 +8,12 @@ import {
   Modal,
   ModalBody,
   ModalContent,
+  ModalFooter,
+  ModalHeader,
   Spinner,
+  useDisclosure,
 } from '@/app/components/ui'
-import { isApiErrorResponse } from '@/lib/api-clients'
+import { ApiErrorResponse, isApiErrorResponse } from '@/lib/api-clients'
 import { cn } from '@/lib/ui-helpers'
 import { toggleArrayValue } from '@/lib/util'
 import {
@@ -48,11 +51,17 @@ type BulkOpOptions<T = void> = {
 }
 
 export function TaskList({ userId, tasks, className, ...props }: TaskListProps) {
+  const router = useRouter()
   const [selectedTaskIds, setSelectedTaskIds] = React.useState<string[]>([])
   const [togglingCompleted, startToggleCompleted] = React.useTransition()
   const [togglingTaskId, setTogglingTaskId] = React.useState<string>()
   const [bulkOpPending, startBulkOp] = React.useTransition()
-  const router = useRouter()
+  const {
+    isOpen: isConfirmDeleteOpen,
+    onOpen: openConfirmDelete,
+    onOpenChange: onConfirmDeleteOpenChange,
+    onClose: onConfirmDeleteClose,
+  } = useDisclosure()
 
   const allSelected = selectedTaskIds.length === tasks.length
   const bulkOpsDisabled = bulkOpPending || !!togglingTaskId?.length || !selectedTaskIds.length
@@ -136,14 +145,31 @@ export function TaskList({ userId, tasks, className, ...props }: TaskListProps) 
     [selectedTaskIds]
   )
 
+  const handleConfirmDeleteSelected = React.useCallback(() => {
+    if (selectedTaskIds?.length) {
+      openConfirmDelete()
+    }
+  }, [selectedTaskIds, openConfirmDelete])
+
   const handleDeleteSelectedTasks = React.useCallback(() => {
     startBulkOpIfSelection({
       successMsg: 'Task(s) deleted',
       successIcon: <Trash2Icon />,
       failMsg: 'Failed to delete task(s)',
-      op: async taskIds => await deleteTasks(userId, taskIds),
+      op: async taskIds => {
+        try {
+          return await deleteTasks(userId, taskIds)
+        } catch (error) {
+          return {
+            error: true,
+            message: coalesceErrorMsg(error)
+          } as ApiErrorResponse
+        } finally {
+          onConfirmDeleteClose()
+        }
+      },
     })
-  }, [userId, startBulkOpIfSelection])
+  }, [userId, startBulkOpIfSelection, onConfirmDeleteClose])
 
   const handleMarkSelectedComplete = React.useCallback(() => {
     startBulkOpIfSelection({
@@ -215,7 +241,7 @@ export function TaskList({ userId, tasks, className, ...props }: TaskListProps) 
             variant="solid"
             size="sm"
             isDisabled={bulkOpsDisabled}
-            onPress={handleDeleteSelectedTasks}
+            onPress={handleConfirmDeleteSelected}
           >
             <Trash2Icon size="16" /> Delete Selected
           </Button>
@@ -229,7 +255,7 @@ export function TaskList({ userId, tasks, className, ...props }: TaskListProps) 
               <Checkbox
                 size="lg"
                 classNames={{
-                  wrapper: 'before:border-content1 before:bg-content3'
+                  wrapper: 'before:border-content1 before:bg-content3',
                 }}
                 isDisabled={bulkOpPending}
                 isSelected={selectedTaskIds.includes(task._id)}
@@ -251,11 +277,34 @@ export function TaskList({ userId, tasks, className, ...props }: TaskListProps) 
           </li>
         </ul>
       </div>
+
       <Modal isOpen={bulkOpPending} hideCloseButton>
         <ModalContent className="bg-content1/40 w-auto p-6 backdrop-blur-xs">
           <ModalBody className="w-auto flex-none">
             <Spinner size="lg" />
           </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={isConfirmDeleteOpen} onOpenChange={onConfirmDeleteOpenChange}>
+        <ModalContent>
+          <ModalHeader>Confirm Deletion</ModalHeader>
+          <ModalBody>
+            <p>Are you sure you want to delete the {selectedTaskIds.length} selected tasks?</p>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" color="default" variant="light" onPress={onConfirmDeleteClose}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              color="danger"
+              variant="solid"
+              onPress={handleDeleteSelectedTasks}
+            >
+              Delete {selectedTaskIds.length} Tasks
+            </Button>
+          </ModalFooter>
         </ModalContent>
       </Modal>
     </>
