@@ -1,11 +1,53 @@
 name: micro-service-task-app
 
 services:
-  mongo:
+  jaeger-all-in-one:
+    container_name: jaeger-all-in-one
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "14268"
+      - "14250"
+    restart: unless-stopped
+
+  zipkin-all-in-one:
+    container_name: zipkin-all-in-one
+    image: openzipkin/zipkin:latest
+    ports:
+      - "9411:9411"
+    restart: unless-stopped
+
+  otel-collector:
+    container_name: otel-collector
+    image: ${OTELCOL_IMG}
+    ports:
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "55679:55679" # zpages extension
     volumes:
-      - mongo_data:/data/db
-    image: mongodb/mongodb-community-server:8.0-ubi8
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml", "${OTELCOL_ARGS}"]
+    depends_on:
+      - jaeger-all-in-one
+      - zipkin-all-in-one
+    restart: unless-stopped
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    restart: unless-stopped
+
+  mongo:
     container_name: mongo
+    image: mongodb/mongodb-community-server:8.0-ubi8
     ports:
       - "${MONGODB__PORT}:27017"
     secrets:
@@ -13,6 +55,8 @@ services:
         target: mongo.pem
       - source: ca_cert
         target: ca.cert.pem
+    volumes:
+      - mongo_data:/data/db
     command:
       - mongod
       - --bind_ip_all
@@ -30,8 +74,6 @@ services:
     ports:
       - "${RABBITMQ__PORT}:5671"
       - "${RABBITMQ__WEB_PORT}:15672"
-    volumes:
-      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -39,22 +81,23 @@ services:
         target: rabbitmq.cert.pem
       - source: rabbitmq_key
         target: rabbitmq.key.pem
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     restart: unless-stopped
 
   smtp-server:
     container_name: smtp-server
+    image: maildev/maildev:latest
     environment:
       - MAILDEV_SMTP_PORT=${SMTP__PORT}
       - SMTP__USER=${SMTP__USER}
       - SMTP__PASS=${SMTP__PASS}
       - MAILDEV_WEB_PORT=${MAILDEV_WEB_PORT}
-    volumes:
-      - mail_data:/maildata
-    image: maildev/maildev:latest
-    user: root
     ports:
       - "${MAILDEV_WEB_PORT}:1080" # Web UI
       - "${SMTP__PORT}:1025" # SMTP server
+    volumes:
+      - mail_data:/maildata
     command:
       [
         "maildev",
@@ -65,10 +108,14 @@ services:
         "--incoming-pass",
         "${SMTP__PASS}",
       ]
+    user: root
     restart: unless-stopped
 
   oauth-service:
     container_name: oauth-service
+    profiles: [full]
+    ports:
+      - "${OAUTH_SVC__PORT}:3001"
     environment:
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
@@ -92,14 +139,15 @@ services:
       context: ./
       dockerfile: ./Dockerfile
       target: runtime_oauth_service
-    ports:
-      - "${OAUTH_SVC__PORT}:3001"
     depends_on:
       - mongo
     restart: unless-stopped
 
   task-service:
     container_name: task-service
+    profiles: [full]
+    ports:
+      - "${TASK_SVC__PORT}:3002"
     environment:
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
@@ -132,8 +180,6 @@ services:
       context: ./
       dockerfile: ./Dockerfile
       target: runtime_task_service
-    ports:
-      - "${TASK_SVC__PORT}:3002"
     depends_on:
       - mongo
       - rabbitmq
@@ -141,6 +187,7 @@ services:
 
   notification-service:
     container_name: notification-service
+    profiles: [full]
     environment:
       - NOTIFY_SVC__FROM_EMAIL=noreply@notification-service.local
       - MONGODB__HOST=${MONGODB__HOST}
@@ -180,6 +227,10 @@ services:
     restart: unless-stopped
 
   web-ui:
+    container_name: web-ui
+    profiles: [full]
+    ports:
+      - "${WEB_UI__PORT}:3000"
     environment:
       - WEB_UI__PORT=${WEB_UI__PORT}
       - OAUTH_SVC__PORT=${OAUTH_SVC__PORT}
@@ -223,9 +274,6 @@ services:
           target: web-ui.key.pem
         - source: web_ui_pem
           target: web-ui.pem
-    container_name: web-ui
-    ports:
-      - "${WEB_UI__PORT}:3000"
     depends_on:
       - oauth-service
       - task-service

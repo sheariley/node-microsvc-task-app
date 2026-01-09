@@ -20,8 +20,8 @@
     "dev:task-service": "npm run dev --workspace=services/task-service",
     "dev:notification-service": "npm run dev --workspace=services/notification-service",
     "dev:web": "npm run dev --workspace=ui/ms-task-app-web",
-    "compose:dev": "docker compose up --build -d mongo rabbitmq smtp-server",
-    "compose:up": "docker compose up --build -d",
+    "compose:dev": "docker compose up --build -d",
+    "compose:full": "docker compose --profile full up --build -d",
     "compose:down": "docker compose down"
   },
   "workspaces": [
@@ -31,6 +31,11 @@
   ],
   "dependencies": {
     "@auth/core": "0.41.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.209.0",
+    "@opentelemetry/resources": "^2.3.0",
+    "@opentelemetry/sdk-node": "^0.209.0",
+    "@opentelemetry/sdk-trace-node": "^2.3.0",
+    "@opentelemetry/semantic-conventions": "^1.38.0",
     "body-parser": "^2.2.1",
     "express": "^5.2.1",
     "mongoose": "^9.0.1",
