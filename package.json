@@ -23,7 +23,7 @@
     "dev:web": "npm run dev --workspace=ui/ms-task-app-web",
     "compose:dev": "docker compose up --build -d",
     "compose:full": "docker compose --profile full up --build -d",
-    "compose:down": "docker compose down"
+    "compose:down": "docker compose --profile full down"
   },
   "workspaces": [
     "/ui/*",
