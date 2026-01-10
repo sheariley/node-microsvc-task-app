@@ -279,6 +279,7 @@ RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=build_web_ui /repo/ui/ms-task-app-web/.next/standalone/node_modules* ./ui/ms-task-app-web/.next/standalone/node_modules
 COPY --from=build_web_ui --chown=nextjs:nodejs /repo/ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web ./ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web
 COPY --from=build_web_ui --chown=nextjs:nodejs /repo/ui/ms-task-app-web/.next/static ./ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web/.next/static
 COPY --from=build_web_ui /repo/ui/ms-task-app-web/public* ./ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web/public

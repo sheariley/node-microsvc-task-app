@@ -119,10 +119,14 @@ services:
     environment:
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
+      - RABBITMQ__HOST=${RABBITMQ__HOST}
+      - RABBITMQ__PORT=${RABBITMQ__PORT}
+      - RABBITMQ__ACCOUNT_LINKED_QUEUE_NAME=${RABBITMQ__ACCOUNT_LINKED_QUEUE_NAME}
       - OAUTH_SVC__CA_CERT_PATH=/run/secrets/ca.cert.pem
       - OAUTH_SVC__PRIVATE_KEY_PATH=/run/secrets/oauth-service.key.pem
       - OAUTH_SVC__CERT_PATH=/run/secrets/oauth-service.cert.pem
       - OAUTH_SVC__KEY_CERT_COMBO_PATH=/run/secrets/oauth-service.pem
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -165,6 +169,7 @@ services:
       - TASK_SVC__PRIVATE_KEY_PATH=/run/secrets/task-service.key.pem
       - TASK_SVC__CERT_PATH=/run/secrets/task-service.cert.pem
       - TASK_SVC__KEY_CERT_COMBO_PATH=/run/secrets/task-service.pem
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -198,6 +203,7 @@ services:
       - RABBITMQ__PORT=${RABBITMQ__PORT}
       - RABBITMQ__TASK_CREATED_QUEUE_NAME=${RABBITMQ__TASK_CREATED_QUEUE_NAME}
       - RABBITMQ__TASK_UPDATED_QUEUE_NAME=${RABBITMQ__TASK_UPDATED_QUEUE_NAME}
+      - RABBITMQ__ACCOUNT_LINKED_QUEUE_NAME=${RABBITMQ__ACCOUNT_LINKED_QUEUE_NAME}
       - SMTP__HOST=${SMTP__HOST}
       - SMTP__PORT=${SMTP__PORT}
       - SMTP__USER=${SMTP__USER}
@@ -206,6 +212,7 @@ services:
       - NOTIFY_SVC__PRIVATE_KEY_PATH=/run/secrets/notification-service.key.pem
       - NOTIFY_SVC__CERT_PATH=/run/secrets/notification-service.cert.pem
       - NOTIFY_SVC__KEY_CERT_COMBO_PATH=/run/secrets/notification-service.pem
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -247,6 +254,7 @@ services:
       - WEB_UI__PRIVATE_KEY_PATH=/run/secrets/web-ui.key.pem
       - WEB_UI__CERT_PATH=/run/secrets/web-ui.cert.pem
       - WEB_UI__KEY_CERT_COMBO_PATH=/run/secrets/web-ui.pem
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
     secrets:
       - source: ca_cert
         target: ca.cert.pem
