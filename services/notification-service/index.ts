@@ -1,7 +1,9 @@
+import './instrumentation.ts'
+
 import {
   coalesceErrorMsg,
-  redactedServerConfig,
   getServerConfig,
+  redactedServerConfig,
   type TaskAppServerConfig,
 } from 'ms-task-app-common'
 import { UserModel } from 'ms-task-app-entities'

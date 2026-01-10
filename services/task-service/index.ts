@@ -1,3 +1,5 @@
+import './instrumentation.ts'
+
 import bodyParser from 'body-parser'
 import express, { type RequestHandler } from 'express'
 import type { Query } from 'express-serve-static-core'
@@ -93,7 +95,7 @@ async function main() {
       })
     )
   }
-  
+
   // used for container health-check
   app.get('/ping', async (req, res) => {
     res.status(200).json({ timestamp: Date.now() })
@@ -354,7 +356,7 @@ async function main() {
     res.status(200).json({ deletedCount: deleteResult.deletedCount })
   })
 
-  // Not found 
+  // Not found
   app.use((req, res) => {
     res.status(404).json({ error: true, message: 'Not found' })
   })

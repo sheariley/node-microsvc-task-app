@@ -19,6 +19,7 @@
     "ms-task-app-dto": "0.0.0",
     "ms-task-app-entities": "0.0.0",
     "ms-task-app-service-util": "0.0.0",
+    "ms-task-app-telemetry": "0.0.0",
     "nodemailer": "^7.0.11"
   },
   "devDependencies": {

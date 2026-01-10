@@ -1,3 +1,5 @@
+import './instrumentation.ts'
+
 import { MongoDBAdapter } from '@auth/mongodb-adapter'
 import bodyParser from 'body-parser'
 import express from 'express'
@@ -27,7 +29,7 @@ import {
 import {
   connectMQWithRetry,
   disableResponseCaching,
-  type AccountLinkedQueueMessage
+  type AccountLinkedQueueMessage,
 } from 'ms-task-app-service-util'
 import * as z from 'zod'
 
@@ -485,7 +487,7 @@ async function main() {
     }
   })
 
-  // Not found 
+  // Not found
   app.use((req, res) => {
     res.status(404).json({ error: true, message: 'Not found' })
   })

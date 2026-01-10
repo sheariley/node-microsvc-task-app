@@ -12,6 +12,9 @@ COPY /package*.json ./
 # Copy common package.json file
 COPY ./packages/ms-task-app-common/package.json ./packages/ms-task-app-common/
 
+# Copy telemetry package.json file
+COPY ./packages/ms-task-app-telemetry/package.json ./packages/ms-task-app-telemetry/
+
 # Copy DTO package.json file
 COPY ./packages/ms-task-app-dto/package.json ./packages/ms-task-app-dto/
 
@@ -43,6 +46,9 @@ COPY ./tsconfig.json ./
 # Copy common package source code
 COPY ./packages/ms-task-app-common ./packages/ms-task-app-common/
 
+# Copy telemetry package source code
+COPY ./packages/ms-task-app-telemetry ./packages/ms-task-app-telemetry/
+
 # Copy DTO package source code
 COPY ./packages/ms-task-app-dto ./packages/ms-task-app-dto/
 
@@ -60,6 +66,9 @@ COPY ./packages/ms-task-app-service-util ./packages/ms-task-app-service-util/
 
 # Build the common package
 RUN npm run build:common
+
+# Build the telemetry package
+RUN npm run build:telemetry
 
 # Build the DTO package 
 RUN npm run build:dto
@@ -85,6 +94,7 @@ WORKDIR /app
 
 # Copy build artifacts
 COPY --from=build_base /repo/packages/ms-task-app-common ./packages/ms-task-app-common
+COPY --from=build_base /repo/packages/ms-task-app-telemetry ./packages/ms-task-app-telemetry
 COPY --from=build_base /repo/packages/ms-task-app-dto ./packages/ms-task-app-dto
 COPY --from=build_base /repo/packages/ms-task-app-entities ./packages/ms-task-app-entities
 COPY --from=build_base /repo/packages/ms-task-app-mtls ./packages/ms-task-app-mtls

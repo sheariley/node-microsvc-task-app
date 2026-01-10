@@ -7,6 +7,7 @@
     "format": "prettier --write .",
     "check-format": "prettier --check .",
     "build:common": "npm run build --workspace=packages/ms-task-app-common",
+    "build:telemetry": "npm run build --workspace=packages/ms-task-app-telemetry",
     "build:mtls": "npm run build --workspace=packages/ms-task-app-mtls",
     "build:auth": "npm run build --workspace=packages/ms-task-app-auth",
     "build:service-util": "npm run build --workspace=packages/ms-task-app-service-util",
@@ -31,6 +32,9 @@
   ],
   "dependencies": {
     "@auth/core": "0.41.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.67.3",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.209.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.209.0",
     "@opentelemetry/resources": "^2.3.0",
     "@opentelemetry/sdk-node": "^0.209.0",
