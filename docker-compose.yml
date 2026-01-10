@@ -1,6 +1,15 @@
 name: micro-service-task-app
 
 services:
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    restart: unless-stopped
+
   jaeger-all-in-one:
     container_name: jaeger-all-in-one
     image: jaegertracing/all-in-one:latest
@@ -16,7 +25,7 @@ services:
     ports:
       - "9411:9411"
     restart: unless-stopped
-
+    
   otel-collector:
     container_name: otel-collector
     image: ${OTELCOL_IMG}
@@ -34,15 +43,6 @@ services:
     depends_on:
       - jaeger-all-in-one
       - zipkin-all-in-one
-    restart: unless-stopped
-
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
     restart: unless-stopped
 
   mongo:
@@ -141,6 +141,7 @@ services:
       target: runtime_oauth_service
     depends_on:
       - mongo
+      - otel-collector
     restart: unless-stopped
 
   task-service:
@@ -183,6 +184,7 @@ services:
     depends_on:
       - mongo
       - rabbitmq
+      - otel-collector
     restart: unless-stopped
 
   notification-service:
@@ -224,6 +226,7 @@ services:
       - mongo
       - rabbitmq
       - smtp-server
+      - otel-collector
     restart: unless-stopped
 
   web-ui:
@@ -277,6 +280,7 @@ services:
     depends_on:
       - oauth-service
       - task-service
+      - otel-collector
     restart: unless-stopped
 
 volumes:

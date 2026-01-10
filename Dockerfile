@@ -144,7 +144,7 @@ RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no
 EXPOSE ${OAUTH_SVC_PORT}
 
 # Run server
-CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
+CMD ["sh", "-c", "node --loader @opentelemetry/instrumentation/hook.mjs /app/services/${SVC_NAME}/dist/index.js"]
 
 
 # ===============================
@@ -188,7 +188,7 @@ RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no
 EXPOSE ${TASK_SVC_PORT}
 
 # Run server
-CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
+CMD ["sh", "-c", "node --loader @opentelemetry/instrumentation/hook.mjs /app/services/${SVC_NAME}/dist/index.js"]
 
 
 # ===============================
@@ -229,7 +229,7 @@ COPY --from=build_notification_service /repo/services/${SVC_NAME}/package.json .
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 # Run server
-CMD ["sh", "-c", "node /app/services/${SVC_NAME}/dist/index.js"]
+CMD ["sh", "-c", "node --loader @opentelemetry/instrumentation/hook.mjs /app/services/${SVC_NAME}/dist/index.js"]
 
 
 # ===============================
@@ -267,8 +267,6 @@ FROM runtime_base AS runtime_web_ui
 ARG WEB_UI_PORT=3000 OAUTH_SVC_PORT=3001 TASK_SVC_PORT=3002
 ENV NODE_ENV=production
 WORKDIR /app
-
-ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
