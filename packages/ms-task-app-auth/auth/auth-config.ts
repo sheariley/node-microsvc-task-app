@@ -1,4 +1,5 @@
 import type { AuthConfig } from '@auth/core'
+import type { Adapter } from '@auth/core/adapters'
 import GitHub from '@auth/core/providers/github'
 import { type CreateMtlsFetcherPathOptions } from 'ms-task-app-mtls'
 import { RestAdapter } from './authjs-rest-adapter.ts'
@@ -6,14 +7,16 @@ import { RestAdapter } from './authjs-rest-adapter.ts'
 export type AuthConfigOptions = {
   authServiceUrl: string
   mtlsFetcherOptions?: CreateMtlsFetcherPathOptions
+  onConfigHeaders?: (action: keyof Adapter) => Record<string, string>
 }
 
 export function getAuthConfig({
   authServiceUrl,
   mtlsFetcherOptions,
+  onConfigHeaders
 }: AuthConfigOptions): AuthConfig {
   return {
-    adapter: RestAdapter({ baseUrl: authServiceUrl, mtlsFetcherOptions }),
+    adapter: RestAdapter({ baseUrl: authServiceUrl, mtlsFetcherOptions, onConfigHeaders }),
     providers: [GitHub],
     session: {
       strategy: 'jwt',

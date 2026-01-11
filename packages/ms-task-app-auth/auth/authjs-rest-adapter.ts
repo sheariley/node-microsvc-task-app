@@ -11,9 +11,14 @@ import { createMtlsFetcher, type CreateMtlsFetcherPathOptions } from 'ms-task-ap
 export type RestAdapterOptions = {
   baseUrl: string,
   mtlsFetcherOptions?: CreateMtlsFetcherPathOptions
+  onConfigHeaders?: (action: keyof Adapter) => Record<string, string>
 }
 
-export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions): Adapter {
+const onConfigHeadersDefault = () => {
+  return {}
+}
+
+export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onConfigHeadersDefault }: RestAdapterOptions): Adapter {
   let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
   if (mtlsFetcherOptions) {
     const mtlsFetcher = createMtlsFetcher(mtlsFetcherOptions)
@@ -29,6 +34,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...onConfigHeaders('createUser')
         },
         body,
       })
@@ -47,6 +53,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'GET',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('getUser')
         },
       })
 
@@ -69,6 +76,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'GET',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('getUserByEmail')
         },
       })
 
@@ -92,6 +100,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'GET',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('getUserByAccount')
         },
       })
 
@@ -116,6 +125,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...onConfigHeaders('updateUser')
         },
         body,
       })
@@ -134,6 +144,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('deleteUser')
         },
       })
 
@@ -153,6 +164,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...onConfigHeaders('linkAccount')
         },
         body,
       })
@@ -172,6 +184,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('unlinkAccount')
         },
       })
 
@@ -189,6 +202,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'GET',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('getSessionAndUser')
         },
       })
 
@@ -212,6 +226,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...onConfigHeaders('createSession')
         },
         body,
       })
@@ -248,6 +263,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...onConfigHeaders('updateSession')
         },
         body,
       })
@@ -266,6 +282,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('deleteSession')
         },
       })
 
@@ -284,6 +301,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...onConfigHeaders('createVerificationToken')
         },
         body,
       })
@@ -303,6 +321,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions }: RestAdapterOptions)
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
+          ...onConfigHeaders('useVerificationToken')
         },
       })
 

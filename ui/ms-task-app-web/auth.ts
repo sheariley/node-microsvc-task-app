@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic'
 
-import NextAuth, { type NextAuthConfig } from 'next-auth'
+import { context as otelContext, propagation } from '@opentelemetry/api'
 import { getAuthConfig } from 'ms-task-app-auth'
 import { getServerConfig, getServiceBaseUrl } from 'ms-task-app-common'
+import NextAuth, { type NextAuthConfig } from 'next-auth'
 
 const serverEnv = getServerConfig()
 
@@ -20,5 +21,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth(
       certPath: serverEnv.webUi.certPath,
       caPath: serverEnv.webUi.caCertPath,
     },
+    onConfigHeaders: () => {
+      const headers: Record<string, string> = {}
+      try {
+        propagation.inject(otelContext.active(), headers)
+      } catch (error) {
+        // Non-fatal: if propagation fails, continue without injected headers
+        console.warn('OpenTelemetry header injection failed', error)
+      }
+      return headers
+    }
   }) as NextAuthConfig
 )
