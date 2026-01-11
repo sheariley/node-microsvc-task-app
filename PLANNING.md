@@ -16,7 +16,11 @@ Build a task management app composed of containerized micro-services that allows
 - Authentication/Authorization: Use Auth.js (next-auth) to implement OAuth 2.0.
   - Create an API gateway within NextJS web UI for performing auth checks before accessing internal microservice APIs
 - Use mTLS to secure back-end communications
-- Use OpenTelemetry, Jaeger, Prometheus, and OpenSearch for gathering and monitoring telemetry
+- Use OpenTelemetry, Jaeger, and OpenSearch for gathering and monitoring telemetry
+
+## Back-end Configuration
+
+- All back-end service configuration files (ex: opensearch.yml, rabbitmq.conf, etc...) should reside in the `backend-config` directory.
 
 ## Shared Common Utilities library/package - ms-task-app-common
 

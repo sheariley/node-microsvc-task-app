@@ -1,53 +1,79 @@
 name: micro-service-task-app
 
 services:
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:latest
+  opensearch:
+    container_name: opensearch
+    image: opensearchproject/opensearch:3.4.0@sha256:c27e2f52eed924f7b7a98970618debb0f4bea0217b5dbee36f966d27727e18c0
+    networks:
+      - backend
     ports:
-      - "9090:9090"
+      - "9200:9200"
+      - "9600:9600"
+    environment:
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH__ADMIN_PASS}
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
-      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
-    restart: unless-stopped
+      - opensearch_data:/usr/share/opensearch/data
+      - ./backend-config/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+      - ./backend-config/opensearch-security.yml:/usr/share/opensearch/config/opensearch-security/config.yml:ro
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: opensearch_cert
+        target: opensearch.cert.pem
+      - source: opensearch_key
+        target: opensearch.key.pem
+      - source: opensearch_pem
+        target: opensearch.pem
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -k -u \"admin:$OPENSEARCH__ADMIN_PASS\" --cert /run/secrets/opensearch.cert.pem --key /run/secrets/opensearch.key.pem --silent --fail \"https://localhost:9200/_cluster/health?local=true\" || exit 1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
 
-  jaeger-all-in-one:
-    container_name: jaeger-all-in-one
-    image: jaegertracing/all-in-one:latest
+  jaeger:
+    container_name: jaeger
+    image: jaegertracing/jaeger:${JAEGER_VERSION:-latest}
+    networks:
+      backend:
+        # This is the host name used in Prometheus scrape configuration.
+        aliases: [ spm_metrics_source ]
     ports:
-      - "16686:16686"
-      - "14268"
-      - "14250"
-    restart: unless-stopped
-
-  zipkin-all-in-one:
-    container_name: zipkin-all-in-one
-    image: openzipkin/zipkin:latest
-    ports:
-      - "9411:9411"
-    restart: unless-stopped
-    
-  otel-collector:
-    container_name: otel-collector
-    image: ${OTELCOL_IMG}
-    ports:
-      - "1888:1888"   # pprof extension
-      - "8888:8888"   # Prometheus metrics exposed by the collector
-      - "8889:8889"   # Prometheus exporter metrics
-      - "13133:13133" # health_check extension
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
-      - "55679:55679" # zpages extension
+      - "16686:16686" # Jaeger UI http://localhost:16686
+      - "8888:8888"
+      - "8889:8889"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - ES_USERNAME=${OPENSEARCH__ADMIN_USER}
+      - ES_PASSWORD=${OPENSEARCH__ADMIN_PASS}
     volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
-    command: ["--config=/etc/otel-collector-config.yaml", "${OTELCOL_ARGS}"]
+      - "./backend-config/jaeger-ui.json:/etc/jaeger/jaeger-ui.json"
+      - "./backend-config/jaeger-config.yml:/etc/jaeger/config.yml"
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: jaeger_cert
+        target: jaeger.cert.pem
+      - source: jaeger_key
+        target: jaeger.key.pem
+      - source: jaeger_pem
+        target: jaeger.pem
+    command: ["--config", "/etc/jaeger/config.yml"]
     depends_on:
-      - jaeger-all-in-one
-      - zipkin-all-in-one
-    restart: unless-stopped
+      opensearch:
+        condition: service_healthy
 
   mongo:
     container_name: mongo
     image: mongodb/mongodb-community-server:8.0-ubi8
+    networks:
+      - backend
     ports:
       - "${MONGODB__PORT}:27017"
     secrets:
@@ -71,6 +97,8 @@ services:
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:4.2-management-alpine
+    networks:
+      - backend
     ports:
       - "${RABBITMQ__PORT}:5671"
       - "${RABBITMQ__WEB_PORT}:15672"
@@ -82,20 +110,22 @@ services:
       - source: rabbitmq_key
         target: rabbitmq.key.pem
     volumes:
-      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./backend-config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     restart: unless-stopped
 
   smtp-server:
     container_name: smtp-server
     image: maildev/maildev:latest
+    networks:
+      - backend
+    ports:
+      - "${MAILDEV_WEB_PORT}:1080" # Web UI
+      - "${SMTP__PORT}:1025" # SMTP server
     environment:
       - MAILDEV_SMTP_PORT=${SMTP__PORT}
       - SMTP__USER=${SMTP__USER}
       - SMTP__PASS=${SMTP__PASS}
       - MAILDEV_WEB_PORT=${MAILDEV_WEB_PORT}
-    ports:
-      - "${MAILDEV_WEB_PORT}:1080" # Web UI
-      - "${SMTP__PORT}:1025" # SMTP server
     volumes:
       - mail_data:/maildata
     command:
@@ -114,6 +144,8 @@ services:
   oauth-service:
     container_name: oauth-service
     profiles: [full]
+    networks:
+      - backend
     ports:
       - "${OAUTH_SVC__PORT}:3001"
     environment:
@@ -145,12 +177,14 @@ services:
       target: runtime_oauth_service
     depends_on:
       - mongo
-      - otel-collector
+      - jaeger
     restart: unless-stopped
 
   task-service:
     container_name: task-service
     profiles: [full]
+    networks:
+      - backend
     ports:
       - "${TASK_SVC__PORT}:3002"
     environment:
@@ -189,12 +223,14 @@ services:
     depends_on:
       - mongo
       - rabbitmq
-      - otel-collector
+      - jaeger
     restart: unless-stopped
 
   notification-service:
     container_name: notification-service
     profiles: [full]
+    networks:
+      - backend
     environment:
       - NOTIFY_SVC__FROM_EMAIL=noreply@notification-service.local
       - MONGODB__HOST=${MONGODB__HOST}
@@ -233,12 +269,14 @@ services:
       - mongo
       - rabbitmq
       - smtp-server
-      - otel-collector
+      - jaeger
     restart: unless-stopped
 
   web-ui:
     container_name: web-ui
     profiles: [full]
+    networks:
+      - backend
     ports:
       - "${WEB_UI__PORT}:3000"
     environment:
@@ -288,13 +326,17 @@ services:
     depends_on:
       - oauth-service
       - task-service
-      - otel-collector
+      - jaeger
     restart: unless-stopped
+
+networks:
+  backend:
 
 volumes:
   mongo_data:
   mail_data:
   npm_cache:
+  opensearch_data:
 
 secrets:
   ca_cert:
@@ -335,3 +377,17 @@ secrets:
     file: ./.certs/web-ui/web-ui.key.pem
   web_ui_pem:
     file: ./.certs/web-ui/web-ui.pem
+  
+  opensearch_cert:
+    file: ./.certs/opensearch/opensearch.cert.pem
+  opensearch_key:
+    file: ./.certs/opensearch/opensearch.key.pem
+  opensearch_pem:
+    file: ./.certs/opensearch/opensearch.pem
+
+  jaeger_cert:
+    file: ./.certs/jaeger/jaeger.cert.pem
+  jaeger_key:
+    file: ./.certs/jaeger/jaeger.key.pem
+  jaeger_pem:
+    file: ./.certs/jaeger/jaeger.pem

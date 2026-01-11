@@ -54,7 +54,7 @@ $caDir = Join-Path $certsRoot 'ca'
 New-DirectoryIfMissing $caDir
 
 ## Default services list (used when -Services is not provided)
-$defaultServices = @('mongo', 'rabbitmq', 'oauth-service', 'task-service', 'notification-service', 'web-ui')
+$defaultServices = @('mongo', 'rabbitmq', 'jaeger', 'opensearch', 'oauth-service', 'task-service', 'notification-service', 'web-ui')
 
 # If -Services was passed, normalize it to an array. Accept comma-separated, space-separated,
 # or multiple arguments (including positional leftover args).

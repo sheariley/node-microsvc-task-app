@@ -1,0 +1,21 @@
+# Keep single-node discovery for dev
+discovery.type: single-node
+
+network.host: 0.0.0.0
+http.host: 0.0.0.0
+transport.host: 127.0.0.1
+
+# Security plugin TLS settings (point to Docker secrets under /run/secrets)
+plugins.security.ssl.transport.pemcert_filepath: "/run/secrets/opensearch.cert.pem"
+plugins.security.ssl.transport.pemkey_filepath: "/run/secrets/opensearch.key.pem"
+plugins.security.ssl.transport.pemtrustedcas_filepath: "/run/secrets/ca.cert.pem"
+
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.http.clientauth_mode: OPTIONAL
+plugins.security.ssl.http.pemcert_filepath: "/run/secrets/opensearch.cert.pem"
+plugins.security.ssl.http.pemkey_filepath: "/run/secrets/opensearch.key.pem"
+plugins.security.ssl.http.pemtrustedcas_filepath: "/run/secrets/ca.cert.pem"
+
+plugins.security.authcz.admin_dn:
+  - "CN=opensearch"
+  - "CN=jaeger"

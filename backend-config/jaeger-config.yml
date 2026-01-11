@@ -1,0 +1,104 @@
+service:
+  extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+  telemetry:
+    resource:
+      service.name: jaeger
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+    logs:
+      level: debug
+
+extensions:
+  healthcheckv2:
+    use_v2: true
+    http:
+
+  jaeger_query:
+    storage:
+      traces: trace_storage
+      metrics: metric_storage
+    ui:
+      config_file: /etc/jaeger/jaeger-ui.json
+
+  jaeger_storage:
+    # Configure trace storage to use the OpenSearch instance from docker-compose
+    backends:
+      trace_storage: &opensearch_config
+        opensearch:
+          # OpenSearch container & port as defined in docker-compose.yml
+          server_urls: ["https://opensearch:9200"]
+          # TLS settings: use the CA provided as a Docker secret in compose
+          tls:
+            insecure_skip_verify: false
+            ca_file: /run/secrets/ca.cert.pem
+            cert_file: /run/secrets/jaeger.cert.pem
+            key_file: /run/secrets/jaeger.key.pem
+          indices:
+            index_prefix: "jaeger-main"
+            spans:
+              date_layout: "2006-01-02"
+              rollover_frequency: "day"
+              shards: 5
+              replicas: 1
+            services:
+              date_layout: "2006-01-02"
+              rollover_frequency: "day"
+              shards: 5
+              replicas: 1
+            dependencies:
+              date_layout: "2006-01-02"
+              rollover_frequency: "day"
+              shards: 5
+              replicas: 1
+            sampling:
+              date_layout: "2006-01-02"
+              rollover_frequency: "day"
+              shards: 5
+              replicas: 1
+
+      trace_archive:
+        opensearch:
+          server_urls: ["https://opensearch:9200"]
+          tls:
+            insecure_skip_verify: false
+            ca_file: /run/secrets/ca.cert.pem
+            cert_file: /run/secrets/jaeger.cert.pem
+            key_file: /run/secrets/jaeger.key.pem
+          indices:
+            index_prefix: "jaeger-archive"
+
+    # Configure a PromQL-compatible metrics backend so Jaeger Query's
+    # Service Performance Monitoring can read metrics from Prometheus.
+    metric_backends:
+      metric_storage: *opensearch_config
+        # prometheus:
+        #   type: promql
+        #   # URL for the Prometheus HTTP API (adjust host/port for your setup)
+        #   url: "http://prometheus:9090"
+        #   # Optional: query timeout used when querying Prometheus
+        #   query_timeout: 30s
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  batch:
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: trace_storage
