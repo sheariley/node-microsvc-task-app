@@ -1,13 +1,6 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-import { auth } from '@/auth'
-import {
-  createGatewayServiceResolver,
-  excludeHopByHopHeaders,
-  setXForwardedHeaders,
-} from '@/lib/api-routing'
-import { context as otelContext, propagation } from '@opentelemetry/api'
 import {
   coalesceErrorMsg,
   getServerConfig,
@@ -17,6 +10,13 @@ import {
 import { createMtlsFetcher } from 'ms-task-app-mtls'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
+
+import { auth } from '@/auth'
+import {
+  createGatewayServiceResolver,
+  excludeHopByHopHeaders,
+  setXForwardedHeaders,
+} from '@/lib/api-routing'
 import { serviceRoutes } from './service-routes'
 
 let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
@@ -39,6 +39,8 @@ const proxyRequest = auth(async req => {
     return NextResponse.json({ error: true, message: 'Unauthorized' }, { status: 401 })
   }
 
+  console.log('testing 123')
+
   const urlObj = new URL(req.url)
   const prefix = '/api/gateway'
   const forwardPath = urlObj.pathname.startsWith(prefix)
@@ -59,23 +61,6 @@ const proxyRequest = auth(async req => {
   const targetUri = `${targetBase}${urlObj.search}`
   const nextHeaders = await headers()
   const outHeaders = setXForwardedHeaders(urlObj, excludeHopByHopHeaders(nextHeaders))
-
-  // Inject OpenTelemetry trace context into outgoing headers while preserving
-  // any existing incoming `traceparent`.
-  try {
-    const carrier: Record<string, string> = {}
-
-    // Only inject if traceparent isn't already present (case-insensitive)
-    if (!outHeaders.keys().some(key => key.toLowerCase() === 'traceparent')) {
-      propagation.inject(otelContext.active(), carrier)
-    }
-    
-    // Set injected trace context headers for outgoing API request
-    Object.entries(carrier).forEach(([k, v]) => outHeaders.set(k, v))
-  } catch (error) {
-    // Non-fatal: if propagation fails, continue without injected headers
-    console.warn('OpenTelemetry header injection failed', error)
-  }
 
   let body: ArrayBuffer | undefined = undefined
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {

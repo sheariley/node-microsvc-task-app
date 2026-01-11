@@ -1,3 +1,8 @@
-import { startInstrumentation } from 'ms-task-app-telemetry'
+import { getMicroServiceInstrumentations, startInstrumentation } from 'ms-task-app-telemetry'
 
-startInstrumentation({ serviceName: 'task-service' })
+startInstrumentation({
+  serviceName: 'task-service',
+  serviceVersion: '1.0.0',
+  useBatchSpanProcessor: process.env.NODE_ENV === 'production',
+  instrumentations: getMicroServiceInstrumentations(),
+})

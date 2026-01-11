@@ -1,18 +1,4 @@
-import { RouteEntry } from '@/lib/api-routing'
-import { getServerConfig, getServiceBaseUrl } from 'ms-task-app-common'
-
-const serverEnv = getServerConfig()
-
-const taskServiceBaseUrl = getServiceBaseUrl({
-  host: serverEnv.taskSvc.host,
-  port: serverEnv.taskSvc.port,
-  secure: !serverEnv.disableInternalMtls,
-})
-const oauthServiceBaseUrl = getServiceBaseUrl({
-  host: serverEnv.oauthSvc.host,
-  port: serverEnv.oauthSvc.port,
-  secure: !serverEnv.disableInternalMtls,
-})
+import { OAuthServiceBaseUrl, RouteEntry, TaskServiceBaseUrl } from '@/lib/api-routing'
 
 // NOTE: Order matters because first match wins!
 export const serviceRoutes: RouteEntry[] = [
@@ -24,12 +10,12 @@ export const serviceRoutes: RouteEntry[] = [
     // resolver here to assemble a full URL using the configured host/port
     // and the incoming path. This makes it possible to map gateway paths to
     // different backend target paths when needed.
-    service: (path: string) => `${taskServiceBaseUrl}${path}`,
+    service: (path: string) => `${TaskServiceBaseUrl}${path}`,
   },
   {
     name: 'oauth-service',
     // matches: /users or /users/:id
     matcher: /^\/(?:users|providers|sessions|verification-tokens)(?:\/|$)/,
-    service: (path: string) => `${oauthServiceBaseUrl}${path}`,
+    service: (path: string) => `${OAuthServiceBaseUrl}${path}`,
   },
 ]

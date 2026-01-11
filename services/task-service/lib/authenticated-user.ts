@@ -1,8 +1,8 @@
 import { getSession, type Session } from '@auth/express'
-import { context as otelContext, propagation } from '@opentelemetry/api'
 import type { NextFunction, Request, Response } from 'express'
 import { getAuthConfig } from 'ms-task-app-auth'
 import { getServerConfig, getServiceBaseUrl } from 'ms-task-app-common'
+
 import type { Locals } from './express-types.ts'
 
 const serverEnv = getServerConfig()
@@ -20,16 +20,6 @@ const authConfig = getAuthConfig({
         certPath: serverEnv.taskSvc.certPath,
         caPath: serverEnv.taskSvc.caCertPath,
       },
-  onConfigHeaders: () => {
-    const headers: Record<string, string> = {}
-    try {
-      propagation.inject(otelContext.active(), headers)
-    } catch (error) {
-      // Non-fatal: if propagation fails, continue without injected headers
-      console.warn('OpenTelemetry header injection failed', error)
-    }
-    return headers
-  }
 })
 
 export async function authenticatedUser(
