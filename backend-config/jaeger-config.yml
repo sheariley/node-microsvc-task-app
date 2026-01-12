@@ -5,6 +5,10 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [jaeger_storage_exporter]
+    logs:
+      receivers: [otlp]
+      processors: []
+      exporters: [debug]
   telemetry:
     resource:
       service.name: jaeger
@@ -102,3 +106,6 @@ processors:
 exporters:
   jaeger_storage_exporter:
     trace_storage: trace_storage
+  
+  debug:
+    verbosity: basic

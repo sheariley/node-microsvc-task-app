@@ -32,6 +32,7 @@
   ],
   "dependencies": {
     "@auth/core": "0.41.1",
+    "@opentelemetry/api": "^1.9.0",
     "body-parser": "^2.2.1",
     "express": "^5.2.1",
     "mongoose": "^9.0.1",

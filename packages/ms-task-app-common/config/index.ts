@@ -5,10 +5,15 @@ export type ServiceCertConfig = {
   keyCertComboPath: string
 }
 
-export type ServiceConfig = {
+export type ServiceConfig = ServiceCertConfig & {
+  logPath: string
+  logLevel: string
+}
+
+export type WebServiceConfig = ServiceConfig & {
   host: string
   port: number
-} & ServiceCertConfig
+}
 
 export type TaskAppServerConfig = {
   mongodb: { host: string; port: number }
@@ -23,10 +28,10 @@ export type TaskAppServerConfig = {
   smtp: { host: string; port: number; user: string; pass: string }
   maildev: { webPort?: number }
   disableInternalMtls: boolean
-  webUi: ServiceConfig
-  oauthSvc: ServiceConfig
-  taskSvc: ServiceConfig
-  notifySvc: { fromEmail?: string } & ServiceCertConfig
+  webUi: WebServiceConfig
+  oauthSvc: WebServiceConfig
+  taskSvc: WebServiceConfig
+  notifySvc: { fromEmail?: string } & ServiceConfig
 }
 
 export type GetServerConfigOptions = {
@@ -41,41 +46,41 @@ export function getServerConfig(): TaskAppServerConfig {
 
   const cfg: TaskAppServerConfig = {
     mongodb: {
-      host: process.env.MONGODB__HOST ?? (CONFIG_DEFAULTS.mongodb?.host as string),
+      host: process.env.MONGODB__HOST ?? CONFIG_DEFAULTS.mongodb.host,
       port: process.env.MONGODB__PORT
         ? Number(process.env.MONGODB__PORT)
-        : (CONFIG_DEFAULTS.mongodb?.port as number),
+        : CONFIG_DEFAULTS.mongodb.port,
     },
 
     rabbitmq: {
-      host: process.env.RABBITMQ__HOST ?? (CONFIG_DEFAULTS.rabbitmq?.host as string),
-      port: Number(process.env.RABBITMQ__PORT ?? CONFIG_DEFAULTS.rabbitmq?.port),
+      host: process.env.RABBITMQ__HOST ?? CONFIG_DEFAULTS.rabbitmq.host,
+      port: Number(process.env.RABBITMQ__PORT ?? CONFIG_DEFAULTS.rabbitmq.port),
       webPort: process.env.RABBITMQ__WEB_PORT
         ? Number(process.env.RABBITMQ__WEB_PORT)
-        : CONFIG_DEFAULTS.rabbitmq?.webPort,
+        : CONFIG_DEFAULTS.rabbitmq.webPort,
       taskCreatedQueueName:
         process.env.RABBITMQ__TASK_CREATED_QUEUE_NAME ??
-        (CONFIG_DEFAULTS.rabbitmq?.taskCreatedQueueName as string),
+        CONFIG_DEFAULTS.rabbitmq.taskCreatedQueueName,
       taskUpdatedQueueName:
         process.env.RABBITMQ__TASK_UPDATED_QUEUE_NAME ??
-        (CONFIG_DEFAULTS.rabbitmq?.taskUpdatedQueueName as string),
+        CONFIG_DEFAULTS.rabbitmq.taskUpdatedQueueName,
       accountLinkedQueueName:
         process.env.RABBITMQ__ACCOUNT_LINKED_QUEUE_NAME ??
-        (CONFIG_DEFAULTS.rabbitmq?.accountLinkedQueueName as string),
+        CONFIG_DEFAULTS.rabbitmq.accountLinkedQueueName,
     },
 
     smtp: {
-      host: process.env.SMTP__HOST ?? (CONFIG_DEFAULTS.smtp?.host as string),
-      port: Number(process.env.SMTP__PORT ?? CONFIG_DEFAULTS.smtp?.port),
-      user: process.env.SMTP__USER ?? (CONFIG_DEFAULTS.smtp?.user as string),
-      pass: process.env.SMTP__PASS ?? (CONFIG_DEFAULTS.smtp?.pass as string),
+      host: process.env.SMTP__HOST ?? CONFIG_DEFAULTS.smtp.host,
+      port: Number(process.env.SMTP__PORT ?? CONFIG_DEFAULTS.smtp.port),
+      user: process.env.SMTP__USER ?? CONFIG_DEFAULTS.smtp.user,
+      pass: process.env.SMTP__PASS ?? CONFIG_DEFAULTS.smtp.pass,
     },
 
     maildev: {
       webPort:
         (process.env.MAILDEV__WEB_PORT ?? process.env.MAILDEV_WEB_PORT)
           ? Number(process.env.MAILDEV__WEB_PORT ?? process.env.MAILDEV_WEB_PORT)
-          : CONFIG_DEFAULTS.maildev?.webPort,
+          : CONFIG_DEFAULTS.maildev.webPort,
     },
 
     disableInternalMtls:
@@ -84,58 +89,53 @@ export function getServerConfig(): TaskAppServerConfig {
         : (CONFIG_DEFAULTS.disableInternalMtls ?? false),
 
     webUi: {
-      host: process.env.WEB_UI__HOST ?? (CONFIG_DEFAULTS.webUi?.host as string),
-      port: Number(process.env.WEB_UI__PORT ?? CONFIG_DEFAULTS.webUi?.port),
-      privateKeyPath:
-        process.env.WEB_UI__PRIVATE_KEY_PATH ?? (CONFIG_DEFAULTS.webUi?.privateKeyPath as string),
-      certPath: process.env.WEB_UI__CERT_PATH ?? (CONFIG_DEFAULTS.webUi?.certPath as string),
-      caCertPath: process.env.WEB_UI__CA_CERT_PATH ?? (CONFIG_DEFAULTS.webUi?.caCertPath as string),
+      logPath: process.env.WEB_UI__LOG_PATH ?? CONFIG_DEFAULTS.webUi.logPath,
+      logLevel: process.env.WEB_UI__LOG_LEVEL ?? CONFIG_DEFAULTS.webUi.logLevel,
+      host: process.env.WEB_UI__HOST ?? CONFIG_DEFAULTS.webUi.host,
+      port: Number(process.env.WEB_UI__PORT ?? CONFIG_DEFAULTS.webUi.port),
+      privateKeyPath: process.env.WEB_UI__PRIVATE_KEY_PATH ?? CONFIG_DEFAULTS.webUi.privateKeyPath,
+      certPath: process.env.WEB_UI__CERT_PATH ?? CONFIG_DEFAULTS.webUi.certPath,
+      caCertPath: process.env.WEB_UI__CA_CERT_PATH ?? CONFIG_DEFAULTS.webUi.caCertPath,
       keyCertComboPath:
-        process.env.WEB_UI__KEY_CERT_COMBO_PATH ??
-        (CONFIG_DEFAULTS.webUi?.keyCertComboPath as string),
+        process.env.WEB_UI__KEY_CERT_COMBO_PATH ?? CONFIG_DEFAULTS.webUi.keyCertComboPath,
     },
 
     oauthSvc: {
-      host: process.env.OAUTH_SVC__HOST ?? (CONFIG_DEFAULTS.oauthSvc?.host as string),
-      port: Number(process.env.OAUTH_SVC__PORT ?? CONFIG_DEFAULTS.oauthSvc?.port),
+      logPath: process.env.OAUTH_SVC__LOG_PATH ?? CONFIG_DEFAULTS.oauthSvc.logPath,
+      logLevel: process.env.OAUTH_SVC__LOG_LEVEL ?? CONFIG_DEFAULTS.oauthSvc.logLevel,
+      host: process.env.OAUTH_SVC__HOST ?? CONFIG_DEFAULTS.oauthSvc.host,
+      port: Number(process.env.OAUTH_SVC__PORT ?? CONFIG_DEFAULTS.oauthSvc.port),
       privateKeyPath:
-        process.env.OAUTH_SVC__PRIVATE_KEY_PATH ??
-        (CONFIG_DEFAULTS.oauthSvc?.privateKeyPath as string),
-      certPath: process.env.OAUTH_SVC__CERT_PATH ?? (CONFIG_DEFAULTS.oauthSvc?.certPath as string),
-      caCertPath:
-        process.env.OAUTH_SVC__CA_CERT_PATH ?? (CONFIG_DEFAULTS.oauthSvc?.caCertPath as string),
+        process.env.OAUTH_SVC__PRIVATE_KEY_PATH ?? CONFIG_DEFAULTS.oauthSvc.privateKeyPath,
+      certPath: process.env.OAUTH_SVC__CERT_PATH ?? CONFIG_DEFAULTS.oauthSvc.certPath,
+      caCertPath: process.env.OAUTH_SVC__CA_CERT_PATH ?? CONFIG_DEFAULTS.oauthSvc.caCertPath,
       keyCertComboPath:
-        process.env.OAUTH_SVC__KEY_CERT_COMBO_PATH ??
-        (CONFIG_DEFAULTS.oauthSvc?.keyCertComboPath as string),
+        process.env.OAUTH_SVC__KEY_CERT_COMBO_PATH ?? CONFIG_DEFAULTS.oauthSvc.keyCertComboPath,
     },
 
     taskSvc: {
-      host: process.env.TASK_SVC__HOST ?? (CONFIG_DEFAULTS.taskSvc?.host as string),
-      port: Number(process.env.TASK_SVC__PORT ?? CONFIG_DEFAULTS.taskSvc?.port),
+      logPath: process.env.TASK_SVC__LOG_PATH ?? CONFIG_DEFAULTS.taskSvc.logPath,
+      logLevel: process.env.TASK_SVC__LOG_LEVEL ?? CONFIG_DEFAULTS.taskSvc.logLevel,
+      host: process.env.TASK_SVC__HOST ?? CONFIG_DEFAULTS.taskSvc.host,
+      port: Number(process.env.TASK_SVC__PORT ?? CONFIG_DEFAULTS.taskSvc.port),
       privateKeyPath:
-        process.env.TASK_SVC__PRIVATE_KEY_PATH ??
-        (CONFIG_DEFAULTS.taskSvc?.privateKeyPath as string),
-      certPath: process.env.TASK_SVC__CERT_PATH ?? (CONFIG_DEFAULTS.taskSvc?.certPath as string),
-      caCertPath:
-        process.env.TASK_SVC__CA_CERT_PATH ?? (CONFIG_DEFAULTS.taskSvc?.caCertPath as string),
+        process.env.TASK_SVC__PRIVATE_KEY_PATH ?? CONFIG_DEFAULTS.taskSvc.privateKeyPath,
+      certPath: process.env.TASK_SVC__CERT_PATH ?? CONFIG_DEFAULTS.taskSvc.certPath,
+      caCertPath: process.env.TASK_SVC__CA_CERT_PATH ?? CONFIG_DEFAULTS.taskSvc.caCertPath,
       keyCertComboPath:
-        process.env.TASK_SVC__KEY_CERT_COMBO_PATH ??
-        (CONFIG_DEFAULTS.taskSvc?.keyCertComboPath as string),
+        process.env.TASK_SVC__KEY_CERT_COMBO_PATH ?? CONFIG_DEFAULTS.taskSvc.keyCertComboPath,
     },
 
     notifySvc: {
-      fromEmail:
-        process.env.NOTIFY_SVC__FROM_EMAIL ?? (CONFIG_DEFAULTS.notifySvc?.fromEmail as string),
+      logPath: process.env.NOTIFY_SVC__LOG_PATH ?? CONFIG_DEFAULTS.notifySvc.logPath,
+      logLevel: process.env.NOTIFY_SVC__LOG_LEVEL ?? CONFIG_DEFAULTS.notifySvc.logLevel,
+      fromEmail: process.env.NOTIFY_SVC__FROM_EMAIL ?? CONFIG_DEFAULTS.notifySvc.fromEmail,
       privateKeyPath:
-        process.env.NOTIFY_SVC__PRIVATE_KEY_PATH ??
-        (CONFIG_DEFAULTS.notifySvc?.privateKeyPath as string),
-      certPath:
-        process.env.NOTIFY_SVC__CERT_PATH ?? (CONFIG_DEFAULTS.notifySvc?.certPath as string),
-      caCertPath:
-        process.env.NOTIFY_SVC__CA_CERT_PATH ?? (CONFIG_DEFAULTS.notifySvc?.caCertPath as string),
+        process.env.NOTIFY_SVC__PRIVATE_KEY_PATH ?? CONFIG_DEFAULTS.notifySvc.privateKeyPath,
+      certPath: process.env.NOTIFY_SVC__CERT_PATH ?? CONFIG_DEFAULTS.notifySvc.certPath,
+      caCertPath: process.env.NOTIFY_SVC__CA_CERT_PATH ?? CONFIG_DEFAULTS.notifySvc.caCertPath,
       keyCertComboPath:
-        process.env.NOTIFY_SVC__KEY_CERT_COMBO_PATH ??
-        (CONFIG_DEFAULTS.notifySvc?.keyCertComboPath as string),
+        process.env.NOTIFY_SVC__KEY_CERT_COMBO_PATH ?? CONFIG_DEFAULTS.notifySvc.keyCertComboPath,
     },
   }
 
@@ -151,13 +151,13 @@ export function redactedServerConfig(cfg: TaskAppServerConfig): TaskAppServerCon
     ...cfg,
     smtp: {
       ...cfg.smtp,
-      user: '[REDACTED]',
-      pass: '[REDACTED]',
+      user: '[Redacted]',
+      pass: '[Redacted]',
     },
   }
 }
 
-const CONFIG_DEFAULTS: Partial<TaskAppServerConfig> = {
+const CONFIG_DEFAULTS: TaskAppServerConfig = {
   mongodb: { host: 'mongo', port: 27017 },
   rabbitmq: {
     host: 'rabbitmq',
@@ -171,6 +171,8 @@ const CONFIG_DEFAULTS: Partial<TaskAppServerConfig> = {
   maildev: { webPort: 1080 },
   disableInternalMtls: false,
   webUi: {
+    logPath: '../../logs/web-ui.log',
+    logLevel: 'info',
     host: 'web-ui',
     port: 3000,
     privateKeyPath: '../../.certs/web-ui/web-ui.key.pem',
@@ -179,6 +181,8 @@ const CONFIG_DEFAULTS: Partial<TaskAppServerConfig> = {
     keyCertComboPath: '../../.certs/web-ui/web-ui.pem',
   },
   oauthSvc: {
+    logPath: '../../logs/oauth-service.log',
+    logLevel: 'info',
     host: 'oauth-service',
     port: 3001,
     privateKeyPath: '../../.certs/oauth-service/oauth-service.key.pem',
@@ -187,6 +191,8 @@ const CONFIG_DEFAULTS: Partial<TaskAppServerConfig> = {
     keyCertComboPath: '../../.certs/oauth-service/oauth-service.pem',
   },
   taskSvc: {
+    logPath: '../../logs/task-service.log',
+    logLevel: 'info',
     host: 'task-service',
     port: 3002,
     privateKeyPath: '../../.certs/task-service/task-service.key.pem',
@@ -195,6 +201,8 @@ const CONFIG_DEFAULTS: Partial<TaskAppServerConfig> = {
     keyCertComboPath: '../../.certs/task-service/task-service.pem',
   },
   notifySvc: {
+    logPath: '../../logs/notification-service.log',
+    logLevel: 'info',
     fromEmail: 'noreply@notification-service.local',
     privateKeyPath: '../../.certs/notification-service/notification-service.key.pem',
     certPath: '../../.certs/notification-service/notification-service.cert.pem',

@@ -16,3 +16,6 @@ notes.md
 
 # scratch files
 .scratch
+
+# local dev logs
+/logs

@@ -6,7 +6,6 @@ import type { Query } from 'express-serve-static-core'
 import fs from 'fs'
 import https from 'https'
 import mongoose from 'mongoose'
-import morgan from 'morgan'
 import { checkClientCert } from 'ms-task-app-auth'
 import { coalesceErrorMsg, getServerConfig, redactedServerConfig } from 'ms-task-app-common'
 import { mapDtoValidationErrors, TaskInputDtoSchema, type TaskInputDto } from 'ms-task-app-dto'
@@ -16,85 +15,115 @@ import {
   connectMQWithRetry,
   disableResponseCaching,
   type TaskCreatedQueueMessage,
-  type TaskUpdatedQueueMessage
+  type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
+import { pinoHttp } from 'pino-http'
+import otel from '@opentelemetry/api'
+
 import { authenticatedUser } from './lib/authenticated-user.ts'
 import type { BulkOpLocals, Locals } from './lib/express-types.ts'
+import logger from './lib/logger.ts'
 import { validBulkOpParams } from './lib/valid-bulk-op-params.ts'
 
 // Server settings
+const serviceName = 'task-service'
 const servicePort = 3002
 
 async function main() {
-  const serverEnv = getServerConfig()
-  console.info('Sever Config', redactedServerConfig(serverEnv))
-  const app = express()
-
-  app.set('trust proxy', true)
-  app.set('etag', false)
-
-  app.use(morgan('dev'))
-  app.use(bodyParser.json())
-  app.use(disableResponseCaching)
-
-  const {
-    mqConnection,
-    mqChannel,
-    error: mqError,
-  } = (await connectMQWithRetry({
-    host: serverEnv.rabbitmq.host,
-    port: serverEnv.rabbitmq.port,
-    tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
-  }))!
-
-  if (mqError || !mqConnection || !mqChannel) {
-    process.exit(1)
-  }
-
-  console.log('Asserting message queues...')
-  await mqChannel.assertQueue(serverEnv.rabbitmq.taskCreatedQueueName)
-  await mqChannel.assertQueue(serverEnv.rabbitmq.taskUpdatedQueueName)
-
-  const { connection: taskDbCon, error: taskDbConError } = (await connectMongoDbWithRetry({
-    host: serverEnv.mongodb.host,
-    port: serverEnv.mongodb.port,
-    dbName: 'tasks',
-    appName: 'task-service',
-    tls: serverEnv.disableInternalMtls
-      ? undefined
-      : {
-          tlsCAFile: serverEnv.taskSvc.caCertPath,
-          tlsCertificateKeyFile: serverEnv.taskSvc.keyCertComboPath,
-        },
-  }))!
-
-  if (taskDbConError || !taskDbCon) {
-    process.exit(1)
-  }
-
-  if (serverEnv.disableInternalMtls) {
-    console.warn('Running without mTLS.')
-  } else {
-    const authorizedCNs: string[] = ['web-ui']
-    app.use(
-      checkClientCert(async ({ clientCert, req }) => {
-        if (!clientCert) {
-          console.warn(`Client cert not present for ${req.url}.`)
-          return false
-        }
-
-        const authorized = !!clientCert && authorizedCNs.includes(clientCert.subject.CN)
-        if (authorized) {
-          console.info(`Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`)
-        } else {
-          console.warn(
-            `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
-          )
-        }
-        return authorized
+  // TODO: Pull service-version from package.json
+  const tracer = otel.trace.getTracer(serviceName, '1.0.0')
+  const { serverEnv, app, mqChannel } = await tracer.startActiveSpan('service-startup', async startupSpan => {
+    try {
+      const serverEnv = getServerConfig()
+  
+      logger.info({ config: redactedServerConfig(serverEnv) }, 'Sever Config')
+      
+      const app = express()
+      app.set('trust proxy', true)
+      app.set('etag', false)
+      app.use(pinoHttp({ logger }))
+      app.use(bodyParser.json())
+      app.use(disableResponseCaching)
+  
+      const {
+        mqConnection,
+        mqChannel,
+        error: mqError,
+      } = await tracer.startActiveSpan('rabbitmq-connect', async rabbitMqConnectSpan => {
+        const results = (await connectMQWithRetry({
+          host: serverEnv.rabbitmq.host,
+          port: serverEnv.rabbitmq.port,
+          tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
+        }))!
+        rabbitMqConnectSpan.end()
+        return results
       })
-    )
-  }
+  
+      if (mqError || !mqConnection || !mqChannel) {
+        process.exit(1)
+      }
+  
+      logger.info('Asserting message queues...')
+      await mqChannel.assertQueue(serverEnv.rabbitmq.taskCreatedQueueName)
+      await mqChannel.assertQueue(serverEnv.rabbitmq.taskUpdatedQueueName)
+  
+      const { connection: taskDbCon, error: taskDbConError } = (await connectMongoDbWithRetry({
+        host: serverEnv.mongodb.host,
+        port: serverEnv.mongodb.port,
+        dbName: 'tasks',
+        appName: 'task-service',
+        tls: serverEnv.disableInternalMtls
+          ? undefined
+          : {
+              tlsCAFile: serverEnv.taskSvc.caCertPath,
+              tlsCertificateKeyFile: serverEnv.taskSvc.keyCertComboPath,
+            },
+      }))!
+  
+      if (taskDbConError || !taskDbCon) {
+        process.exit(1)
+      }
+  
+      if (serverEnv.disableInternalMtls) {
+        logger.warn('Running without mTLS.')
+      } else {
+        const authorizedCNs: string[] = ['web-ui']
+        app.use(
+          checkClientCert(async ({ clientCert, req }) => {
+            if (!clientCert) {
+              logger.warn(`Client cert not present for ${req.url}.`)
+              return false
+            }
+  
+            const authorized = !!clientCert && authorizedCNs.includes(clientCert.subject.CN)
+            if (authorized) {
+              logger.info(`Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`)
+            } else {
+              logger.warn(
+                `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
+              )
+            }
+            return authorized
+          })
+        )
+      }
+  
+      return { serverEnv, app, mqChannel }
+    } catch (error) {
+      let coercedError: Error
+      if (error instanceof Error)
+        coercedError = error
+      else
+        coercedError = new Error('Fatal exception during startup', { cause: error })
+      
+      logger.fatal(coercedError, 'Fatal error during startup')
+      startupSpan.recordException(coercedError)
+      startupSpan.end()
+      process.exit(1)
+    } finally {
+      startupSpan.end()
+    }
+  })
 
   // used for container health-check
   app.get('/ping', async (req, res) => {
@@ -192,7 +221,7 @@ async function main() {
 
       res.status(201).json(task)
     } catch (error) {
-      console.error('Error saving: ', error)
+      logger.error(error, 'Error saving: ')
       const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
@@ -300,10 +329,10 @@ async function main() {
         )
       }
 
-      console.log('Task updated successfully', task)
+      logger.info({ task }, 'Task updated successfully')
       res.status(204).send()
     } catch (error) {
-      console.error('Error saving: ', error)
+      logger.error(error, 'Error saving: ')
       const reason = coalesceErrorMsg(error)
       res.status(500).json({ error: true, message: 'Internal Server Error', reason })
     }
@@ -364,7 +393,7 @@ async function main() {
   // Start listening
   if (serverEnv.disableInternalMtls) {
     app.listen(servicePort, () => {
-      console.log(`Task service listening on unsecure port ${servicePort}`)
+      logger.info(`Task service listening on unsecure port ${servicePort}`)
     })
   } else {
     const httpsServerOptions: https.ServerOptions = {
@@ -375,7 +404,7 @@ async function main() {
       rejectUnauthorized: true, // reject connections with invalid or missing client cert
     }
     https.createServer(httpsServerOptions, app).listen(servicePort, () => {
-      console.log(`Task service listening on secure port ${servicePort}`)
+      logger.info(`Task service listening on secure port ${servicePort}`)
     })
   }
 }

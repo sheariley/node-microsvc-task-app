@@ -12,6 +12,7 @@ services:
     environment:
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH__ADMIN_PASS}
       - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - ES_TAGS_AS_FIELDS_ALL=true
     ulimits:
       memlock:
         soft: -1
