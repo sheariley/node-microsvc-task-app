@@ -12,11 +12,6 @@ export default pino({
 
       // output to log file
       { target: 'pino/file', options: { destination: serverEnv.taskSvc.logPath } },
-
-      {
-        target: 'pino-opentelemetry-transport',
-        options: { 'service.name': 'task-service', 'service.version': '1.0.0' },
-      },
     ],
   },
 })
