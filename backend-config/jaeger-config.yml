@@ -1,14 +1,10 @@
 service:
-  extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+  extensions: [basicauth/os, jaeger_storage, jaeger_query, healthcheckv2]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
       exporters: [jaeger_storage_exporter]
-    logs:
-      receivers: [otlp]
-      processors: []
-      exporters: [debug]
   telemetry:
     resource:
       service.name: jaeger
@@ -28,6 +24,11 @@ extensions:
     use_v2: true
     http:
 
+  basicauth/os:
+    client_auth:
+      username: ${OPENSEARCH__ADMIN_USER}
+      password: ${OPENSEARCH__ADMIN_PASS}
+
   jaeger_query:
     storage:
       traces: trace_storage
@@ -42,6 +43,8 @@ extensions:
         opensearch:
           # OpenSearch container & port as defined in docker-compose.yml
           server_urls: ["https://opensearch:9200"]
+          auth:
+            authenticator: basicauth/os
           # TLS settings: use the CA provided as a Docker secret in compose
           tls:
             insecure_skip_verify: false
@@ -74,29 +77,26 @@ extensions:
       trace_archive:
         opensearch:
           server_urls: ["https://opensearch:9200"]
+          auth:
+            authenticator: basicauth/os
           tls:
             insecure_skip_verify: false
+            insecure: false
             ca_file: /run/secrets/ca.cert.pem
             cert_file: /run/secrets/jaeger.cert.pem
             key_file: /run/secrets/jaeger.key.pem
           indices:
             index_prefix: "jaeger-archive"
-
-    # Configure a PromQL-compatible metrics backend so Jaeger Query's
-    # Service Performance Monitoring can read metrics from Prometheus.
+    
+    # Use the same OpenSearch back-end as traces for the metrics back-end
     metric_backends:
       metric_storage: *opensearch_config
-        # prometheus:
-        #   type: promql
-        #   # URL for the Prometheus HTTP API (adjust host/port for your setup)
-        #   url: "http://prometheus:9090"
-        #   # Optional: query timeout used when querying Prometheus
-        #   query_timeout: 30s
 
 receivers:
   otlp:
     protocols:
       grpc:
+        endpoint: "0.0.0.0:4317"
       http:
         endpoint: "0.0.0.0:4318"
 

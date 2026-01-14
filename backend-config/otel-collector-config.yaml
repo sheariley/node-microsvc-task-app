@@ -1,0 +1,57 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+        
+
+exporters:
+  debug:
+    verbosity: basic
+
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  opensearch/logs:
+    logs_index: "logs-stream"
+    http:
+      endpoint: "https://opensearch:9200"
+      # retry_on_failure: true
+      auth:
+        authenticator: basicauth/os
+      tls:
+        insecure: false
+        ca_file: /run/secrets/ca.cert.pem
+        cert_file: /run/secrets/otel-collector.cert.pem
+        key_file: /run/secrets/otel-collector.key.pem
+
+processors:
+  batch:
+
+extensions:
+  health_check:
+  
+  basicauth/os:
+    client_auth:
+      username: ${OPENSEARCH__ADMIN_USER}
+      password: ${OPENSEARCH__ADMIN_PASS}
+
+service:
+  extensions: [health_check, basicauth/os]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, otlp/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, otlp/jaeger]
+    logs:
+      receivers: [otlp]
+      processors: []
+      exporters: [debug, opensearch/logs]

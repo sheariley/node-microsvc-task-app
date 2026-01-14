@@ -1,0 +1,25 @@
+server.name: opensearch-dashboards
+server.host: "0.0.0.0"
+server.customResponseHeaders : { "Access-Control-Allow-Credentials" : "true" }
+
+server.ssl.enabled: true
+server.ssl.certificate: /run/secrets/opensearch-dashboards.cert.pem
+server.ssl.key: /run/secrets/opensearch-dashboards.key.pem
+server.ssl.certificateAuthorities: ["/run/secrets/ca.cert.pem"]
+
+opensearch.ssl.verificationMode: full
+opensearch.ssl.alwaysPresentCertificate: true
+opensearch.ssl.certificate: /run/secrets/opensearch-dashboards.cert.pem
+opensearch.ssl.key: /run/secrets/opensearch-dashboards.key.pem
+opensearch.ssl.certificateAuthorities: ["/run/secrets/ca.cert.pem"]
+
+opensearch.hosts: ["https://opensearch:9200"]
+opensearch.username: kibanaserver
+opensearch.password: kibanaserver
+opensearch.requestHeadersAllowlist: ["securitytenant","Authorization"]
+
+data_source_management.manageableBy: "dashboard_admin"
+data_source_management.dataSourceAdmin.groups: ["data_source_management"]
+
+opensearchDashboards.dashboardAdmin.groups: ["dashboard_admin"]
+opensearchDashboards.dashboardAdmin.users: ["admin"]

@@ -19,3 +19,6 @@ notes.md
 
 # local dev logs
 /logs
+
+# local backend config files (ex: OpenSearch's internal_users.yml)
+/backend-config/.local

@@ -13,14 +13,25 @@ services:
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH__ADMIN_PASS}
       - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
       - ES_TAGS_AS_FIELDS_ALL=true
+      # Persist the one-time setup marker in a dedicated volume so the
+      # setup script knows the work was already done across container restarts.
+      - OPENSEARCH__SETUP_MARKER=/usr/share/opensearch/data/setup/.opensearch-initial-setup-done
     ulimits:
       memlock:
         soft: -1
         hard: -1
+      nofile:
+        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
+        hard: 65536
     volumes:
       - opensearch_data:/usr/share/opensearch/data
       - ./backend-config/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
       - ./backend-config/opensearch-security.yml:/usr/share/opensearch/config/opensearch-security/config.yml:ro
+      - ./backend-config/.local/opensearch_internal_users.yml:/usr/share/opensearch/config/opensearch-security/internal_users.yml
+      - opensearch_setup:/etc/opensearch/setup
+      # TODO: Document the fact that these files MUST be marked as executable on the host system before attempting to run
+      - ./backend-config/opensearch-initial-setup.sh:/usr/share/opensearch/custom-initial-setup.sh:ro
+      - ./backend-config/opensearch-custom-entrypoint.sh:/usr/share/opensearch/custom-entrypoint.sh:ro
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -30,12 +41,40 @@ services:
         target: opensearch.key.pem
       - source: opensearch_pem
         target: opensearch.pem
+    entrypoint: ["/usr/share/opensearch/custom-entrypoint.sh"]
     healthcheck:
       test: [ "CMD-SHELL", "curl -k -u \"admin:$OPENSEARCH__ADMIN_PASS\" --cert /run/secrets/opensearch.cert.pem --key /run/secrets/opensearch.key.pem --silent --fail \"https://localhost:9200/_cluster/health?local=true\" || exit 1" ]
       interval: 10s
       timeout: 10s
       retries: 30
       start_period: 30s
+
+  opensearch-dashboards:
+    # Make sure the version of opensearch-dashboards matches the version of opensearch installed on other nodes
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: opensearch-dashboards
+    networks:
+      - backend
+    ports:
+      - 5601:5601
+    expose:
+      # Expose port 5601 for web access to OpenSearch Dashboards
+      - "5601"
+    environment:
+      - OPENSEARCH__ADMIN_USER=${OPENSEARCH__ADMIN_USER}
+      - OPENSEARCH__ADMIN_PASS=${OPENSEARCH__ADMIN_PASS}
+    volumes:
+      - ./backend-config/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: opensearch_dashboards_cert
+        target: opensearch-dashboards.cert.pem
+      - source: opensearch_dashboards_key
+        target: opensearch-dashboards.key.pem
+    depends_on:
+      opensearch:
+        condition: service_healthy
 
   jaeger:
     container_name: jaeger
@@ -48,11 +87,12 @@ services:
       - "16686:16686" # Jaeger UI http://localhost:16686
       - "8888:8888"
       - "8889:8889"
-      - "4317:4317"
-      - "4318:4318"
+      - "4317"
+      - "4318"
     environment:
       - ES_USERNAME=${OPENSEARCH__ADMIN_USER}
       - ES_PASSWORD=${OPENSEARCH__ADMIN_PASS}
+      - ES_TAGS_AS_FIELDS_ALL=true
     volumes:
       - "./backend-config/jaeger-ui.json:/etc/jaeger/jaeger-ui.json"
       - "./backend-config/jaeger-config.yml:/etc/jaeger/config.yml"
@@ -69,6 +109,38 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
+    restart: unless-stopped
+
+  otel-collector:
+    container_name: otel-collector
+    image: ${OTELCOL_IMG}
+    networks:
+      - backend
+    ports:
+      - "13133:13133" # health_check extension
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    environment:
+      - OPENSEARCH__ADMIN_USER=${OPENSEARCH__ADMIN_USER}
+      - OPENSEARCH__ADMIN_PASS=${OPENSEARCH__ADMIN_PASS}
+    volumes:
+      - ./backend-config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: otel_collector_cert
+        target: otel-collector.cert.pem
+      - source: otel_collector_key
+        target: otel-collector.key.pem
+      - source: otel_collector_pem
+        target: otel-collector.pem
+    command: ["--config=/etc/otel-collector-config.yaml", "${OTELCOL_ARGS}"]
+    depends_on:
+      jaeger:
+        condition: service_started
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
 
   mongo:
     container_name: mongo
@@ -338,6 +410,7 @@ volumes:
   mail_data:
   npm_cache:
   opensearch_data:
+  opensearch_setup:
 
 secrets:
   ca_cert:
@@ -386,9 +459,23 @@ secrets:
   opensearch_pem:
     file: ./.certs/opensearch/opensearch.pem
 
+  opensearch_dashboards_cert:
+    file: ./.certs/opensearch-dashboards/opensearch-dashboards.cert.pem
+  opensearch_dashboards_key:
+    file: ./.certs/opensearch-dashboards/opensearch-dashboards.key.pem
+  opensearch_dashboards_pem:
+    file: ./.certs/opensearch-dashboards/opensearch-dashboards.pem
+
   jaeger_cert:
     file: ./.certs/jaeger/jaeger.cert.pem
   jaeger_key:
     file: ./.certs/jaeger/jaeger.key.pem
   jaeger_pem:
     file: ./.certs/jaeger/jaeger.pem
+
+  otel_collector_cert:
+    file: ./.certs/otel-collector/otel-collector.cert.pem
+  otel_collector_key:
+    file: ./.certs/otel-collector/otel-collector.key.pem
+  otel_collector_pem:
+    file: ./.certs/otel-collector/otel-collector.pem
