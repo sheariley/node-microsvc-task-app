@@ -102,7 +102,7 @@ curl "${curl_args[@]}" --fail -X PUT "https://localhost:9200/_index_template/log
 log "Creating the log data stream"
 curl "${curl_args[@]}" --fail -X PUT "https://localhost:9200/_data_stream/logs-stream"
 
-# TODO: Add a command to setup a cron job to rollover the log data stream every day at 2AM
+# TODO: Add a command to setup a cron job to rollover the log data stream every day at midnight
 
 # TODO: Setup retention command to trim old logs from logs data stream based on specified retention period
 

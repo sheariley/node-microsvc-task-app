@@ -36,7 +36,7 @@ async function main() {
     try {
       const serverEnv = getServerConfig()
   
-      logger.info({ config: redactedServerConfig(serverEnv) }, 'Sever Config')
+      console.info('Sever Config', { config: redactedServerConfig(serverEnv) })
       
       const app = express()
       app.set('trust proxy', true)
