@@ -71,4 +71,9 @@ export async function connectMQWithRetry({
       }
     }
   }
+  return {
+    mqConnection: null,
+    mqChannel: null,
+    error: new Error(`Max retries exceeded while connecting to RabbitMQ at ${uri}!`),
+  }
 }

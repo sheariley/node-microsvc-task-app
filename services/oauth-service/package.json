@@ -25,6 +25,7 @@
     "ms-task-app-entities": "0.0.0",
     "ms-task-app-service-util": "0.0.0",
     "ms-task-app-telemetry": "0.0.0",
+    "pino-http": "^11.0.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {

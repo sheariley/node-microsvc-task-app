@@ -13,7 +13,6 @@ import {
   Spinner,
   useDisclosure,
 } from '@/app/components/ui'
-import { ApiErrorResponse, isApiErrorResponse } from '@/lib/api-clients'
 import { cn } from '@/lib/ui-helpers'
 import { toggleArrayValue } from '@/lib/util'
 import {
@@ -32,7 +31,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import { coalesceErrorMsg } from 'ms-task-app-common'
-import { TaskDto } from 'ms-task-app-dto'
+import { ApiErrorResponse, isApiErrorResponse, TaskDto } from 'ms-task-app-dto'
 import { useRouter } from 'next/navigation'
 import React from 'react'
 import TaskEditForm from '../task-edit-form/task-edit-form.client'

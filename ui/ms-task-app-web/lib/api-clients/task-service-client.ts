@@ -1,7 +1,7 @@
-import { httpResponseHasBody } from 'ms-task-app-common'
-import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
+import { ApiError, httpResponseHasBody } from 'ms-task-app-common'
+import { isApiErrorResponse, TaskDto, TaskInputDto } from 'ms-task-app-dto'
 import React from 'react'
-import { ApiError, ApiRequestOptionsWithBody, isApiErrorResponse } from './api-result-types'
+import { ApiRequestOptionsWithBody } from './api-response-types'
 
 const GATEWAY_BASE = '/api/gateway'
 
@@ -12,8 +12,14 @@ export type TaskServiceClient = {
   updateTask(userId: string, taskId: string, input: Partial<TaskInputDto>): Promise<void>
   deleteTask(userId: string, taskId: string): Promise<void>
   deleteTasks(userId: string, taskIds: string[]): Promise<{ deleteCount: number }>
-  completeTasks(userId: string, taskIds: string[]): Promise<{ matchedCount: number, modifiedCount: number }>
-  uncompleteTasks(userId: string, taskIds: string[]): Promise<{ matchedCount: number, modifiedCount: number }>
+  completeTasks(
+    userId: string,
+    taskIds: string[]
+  ): Promise<{ matchedCount: number; modifiedCount: number }>
+  uncompleteTasks(
+    userId: string,
+    taskIds: string[]
+  ): Promise<{ matchedCount: number; modifiedCount: number }>
 }
 
 function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceClient {
@@ -22,9 +28,11 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
     const outHeaders: Record<string, string> = {
       ...headers,
       ...opt?.headers,
-      ...(!opt?.body ? {} : {
-        'content-type': 'application/json',
-      })
+      ...(!opt?.body
+        ? {}
+        : {
+            'content-type': 'application/json',
+          }),
     }
     // Use absolute URL for server-side fetch
     let baseUrl = GATEWAY_BASE
@@ -36,7 +44,7 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
       credentials: 'include',
       method,
       headers: outHeaders,
-      body: !opt?.body ? undefined : JSON.stringify(opt.body)
+      body: !opt?.body ? undefined : JSON.stringify(opt.body),
     })
 
     let body: T | null = null
@@ -54,23 +62,23 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
 
   return {
     async getUserTasks(userId: string) {
-      return (await request<TaskDto[]>(`/users/${encodeURIComponent(userId)}/tasks`, {
+      return await request<TaskDto[]>(`/users/${encodeURIComponent(userId)}/tasks`, {
         method: 'GET',
-      }))
+      })
     },
 
     async getUserTaskById(userId: string, taskId: string) {
-      return (await request<TaskDto>(
+      return await request<TaskDto>(
         `/users/${encodeURIComponent(userId)}/tasks/${encodeURIComponent(taskId)}`,
         { method: 'GET' }
-      ))
+      )
     },
 
     async createTask(userId: string, input: TaskInputDto) {
-      return (await request<TaskDto>(`/users/${encodeURIComponent(userId)}/tasks`, {
+      return await request<TaskDto>(`/users/${encodeURIComponent(userId)}/tasks`, {
         method: 'POST',
         body: input,
-      }))
+      })
     },
 
     async updateTask(userId: string, taskId: string, input: Partial<TaskInputDto>) {
@@ -89,22 +97,28 @@ function makeTaskServiceClient(headers?: Record<string, string>): TaskServiceCli
     async deleteTasks(userId: string, taskIds: string[]) {
       return await request<{ deleteCount: number }>(`/users/${encodeURIComponent(userId)}/tasks`, {
         method: 'DELETE',
-        body: taskIds
+        body: taskIds,
       })
     },
 
     async completeTasks(userId: string, taskIds: string[]) {
-      return await request<{ matchedCount: number, modifiedCount: number }>(`/users/${encodeURIComponent(userId)}/tasks/complete`, {
-        method: 'PUT',
-        body: taskIds
-      })
+      return await request<{ matchedCount: number; modifiedCount: number }>(
+        `/users/${encodeURIComponent(userId)}/tasks/complete`,
+        {
+          method: 'PUT',
+          body: taskIds,
+        }
+      )
     },
 
     async uncompleteTasks(userId: string, taskIds: string[]) {
-      return await request<{ matchedCount: number, modifiedCount: number }>(`/users/${encodeURIComponent(userId)}/tasks/uncomplete`, {
-        method: 'PUT',
-        body: taskIds
-      })
+      return await request<{ matchedCount: number; modifiedCount: number }>(
+        `/users/${encodeURIComponent(userId)}/tasks/uncomplete`,
+        {
+          method: 'PUT',
+          body: taskIds,
+        }
+      )
     },
   }
 }

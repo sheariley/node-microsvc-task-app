@@ -49,4 +49,8 @@ export async function connectMongoDbWithRetry({
       }
     }
   }
+  return {
+    connection: null,
+    error: new Error(`Max retries exceeded while connecting to MongoDB at ${uri}!`),
+  }
 }

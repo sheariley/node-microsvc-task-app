@@ -20,7 +20,8 @@
     "ms-task-app-entities": "0.0.0",
     "ms-task-app-service-util": "0.0.0",
     "ms-task-app-telemetry": "0.0.0",
-    "nodemailer": "^7.0.11"
+    "nodemailer": "^7.0.11",
+    "pino-http": "^11.0.0"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",

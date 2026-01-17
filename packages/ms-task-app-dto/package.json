@@ -21,6 +21,7 @@
     "build": "npx tsc -p ./tsconfig.json"
   },
   "dependencies": {
+    "ms-task-app-common": "0.0.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {

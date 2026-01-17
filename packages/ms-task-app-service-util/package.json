@@ -21,9 +21,12 @@
     "build": "npx tsc -p ./tsconfig.json"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
     "amqplib": "^0.10.9",
     "mongoose": "^9.0.1",
-    "ms-task-app-common": "0.0.0"
+    "ms-task-app-common": "0.0.0",
+    "ms-task-app-dto": "0.0.0",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",

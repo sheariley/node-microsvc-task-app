@@ -1,9 +1,8 @@
 'use server'
 
-import { ApiError, ApiErrorResponse } from '@/lib/api-clients'
 import { getSSRTaskServiceClient } from '@/lib/api-clients/ssr'
-import { coalesceErrorMsg } from 'ms-task-app-common'
-import { TaskDto } from 'ms-task-app-dto'
+import { ApiError, coalesceErrorMsg } from 'ms-task-app-common'
+import { ApiErrorResponse, TaskDto } from 'ms-task-app-dto'
 import { refresh } from 'next/cache'
 
 export async function toggleTaskComplete(task: TaskDto) {
