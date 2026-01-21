@@ -78,7 +78,7 @@ function handleErrors<
       includeReason: true,
       beforeErrorRespond: (error, req) => {
         reportExceptionIfActiveSpan(error)
-        logger.error({ error, params: params || req.params }, defaultErrorMessage)
+        logger.error({ err: error, params: params || req.params }, defaultErrorMessage)
       },
     },
     handler
@@ -88,7 +88,7 @@ function handleErrors<
 async function main() {
   // TODO: Pull service-version from package.json
   const tracer = otel.trace.getTracer(serviceName, '1.0.0')
-  await startSelfClosingActiveSpan(tracer, 'service-startup', async startupSpan => {
+  await tracer.startActiveSpan('service-startup', async startupSpan => {
     try {
       const serverEnv = getServerConfig()
       console.info('Sever Config', redactedServerConfig(serverEnv))
@@ -554,15 +554,20 @@ async function main() {
       // Start listening
       if (serverEnv.disableInternalMtls) {
         app.listen(servicePort, error => {
-          if (error) {
-            reportExceptionIfActiveSpan(error)
-            logger.fatal(
-              { error },
-              `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`
-            )
-          } else {
-            logger.info(`${serviceName} listening on unsecure port ${servicePort}`)
+          try {
+            if (error) {
+              reportExceptionIfActiveSpan(error)
+              logger.fatal(
+                error,
+                `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`
+              )
+            } else {
+              logger.info(`${serviceName} listening on unsecure port ${servicePort}`)
+            }
+          } catch {
+            // swallow
           }
+          startupSpan.end()
         })
       } else {
         const httpsServerOptions: https.ServerOptions = {
@@ -572,12 +577,22 @@ async function main() {
           requestCert: true, // request client cert
           rejectUnauthorized: true, // reject connections with invalid or missing client cert
         }
-        https.createServer(httpsServerOptions, app).listen(servicePort, () => {
-          logger.info(`${serviceName} listening on secure port ${servicePort}`)
-        })
+        const server = https
+          .createServer(httpsServerOptions, app)
+          .listen(servicePort, () => {
+            logger.info(`${serviceName} listening on secure port ${servicePort}`)
+            startupSpan.end()
+          })
+          .once('error', err => {
+            if (!server.listening) {
+              logger.fatal(
+                err,
+                `Fatal error during startup, while attempting to listen on port ${servicePort}.`
+              )
+              startupSpan.end()
+            }
+          })
       }
-
-      startupSpan.end()
     } catch (error) {
       let coercedError: Error
       if (error instanceof Error) coercedError = error

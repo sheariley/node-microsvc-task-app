@@ -1,9 +1,10 @@
 import { getServerConfig } from 'ms-task-app-common'
+import { createPinoOtelEventLogger } from 'ms-task-app-telemetry/logging'
 import pino from 'pino'
 
 const serverEnv = getServerConfig()
 
-export default pino({
+export default createPinoOtelEventLogger(pino({
   level: serverEnv.notifySvc.logLevel,
   transport: {
     targets: [
@@ -14,4 +15,4 @@ export default pino({
       { target: 'pino/file', options: { destination: serverEnv.notifySvc.logPath } },
     ],
   },
-})
+}))
