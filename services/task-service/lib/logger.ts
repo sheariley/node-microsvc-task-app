@@ -4,15 +4,17 @@ import pino from 'pino'
 
 const serverEnv = getServerConfig()
 
-export default createPinoOtelEventLogger(pino({
-  level: serverEnv.taskSvc.logLevel,
-  transport: {
-    targets: [
-      // output pretty-print to stdout
-      { target: 'pino-pretty' },
+export default createPinoOtelEventLogger(
+  pino({
+    level: serverEnv.taskSvc.logLevel,
+    transport: {
+      targets: [
+        // output pretty-print to stdout
+        { target: 'pino-pretty' },
 
-      // output to log file
-      { target: 'pino/file', options: { destination: serverEnv.taskSvc.logPath } },
-    ],
-  },
-}))
+        // output to log file
+        { target: 'pino/file', options: { destination: serverEnv.taskSvc.logPath } },
+      ],
+    },
+  })
+)

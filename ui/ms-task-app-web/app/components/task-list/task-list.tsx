@@ -18,7 +18,6 @@ import { toggleArrayValue } from '@/lib/util'
 import {
   completeTasks,
   deleteTasks,
-  toggleTaskComplete,
   uncompleteTasks,
 } from '@/server-actions/task-crud'
 import {
@@ -36,6 +35,7 @@ import { useRouter } from 'next/navigation'
 import React from 'react'
 import TaskEditForm from '../task-edit-form/task-edit-form.client'
 import { TaskListItem } from '../task-list-item/task-list-item'
+import clientLogger from '@/lib/logging/client-logger'
 
 export type TaskListProps = React.ComponentProps<'div'> & {
   userId: string
@@ -70,15 +70,16 @@ export function TaskList({ userId, tasks, className, ...props }: TaskListProps) 
 
     startToggleCompleted(async () => {
       try {
-        const result = await toggleTaskComplete(task)
-        if (result.error) throw new Error(result.message, { cause: result })
-
+        const result = !task.completed ? await completeTasks(userId, [task._id]) : await uncompleteTasks(userId, [task._id])
+        if (isApiErrorResponse(result)) throw new Error(result.message, { cause: result })
+        clientLogger.info(`Successfully toggled completion for task with id ${task._id}.`)
         addToast({
           color: 'success',
           icon: <ThumbsUpIcon />,
           title: !task.completed ? 'Task marked as completed' : 'Task marked as incomplete',
         })
       } catch (error) {
+        clientLogger.error(error, 'Error while toggling task completion')
         const description = coalesceErrorMsg(error)
         addToast({
           color: 'danger',
@@ -92,7 +93,7 @@ export function TaskList({ userId, tasks, className, ...props }: TaskListProps) 
         setTogglingTaskId(undefined)
       }
     })
-  }, [])
+  }, [userId])
 
   const handleToggleAllSelected = React.useCallback(() => {
     if (allSelected) {
@@ -161,7 +162,7 @@ export function TaskList({ userId, tasks, className, ...props }: TaskListProps) 
         } catch (error) {
           return {
             error: true,
-            message: coalesceErrorMsg(error)
+            message: coalesceErrorMsg(error),
           } as ApiErrorResponse
         } finally {
           onConfirmDeleteClose()

@@ -2,22 +2,8 @@
 
 import { getSSRTaskServiceClient } from '@/lib/api-clients/ssr'
 import { ApiError, coalesceErrorMsg } from 'ms-task-app-common'
-import { ApiErrorResponse, TaskDto } from 'ms-task-app-dto'
+import { ApiErrorResponse } from 'ms-task-app-dto'
 import { refresh } from 'next/cache'
-
-export async function toggleTaskComplete(task: TaskDto) {
-  const taskApiClient = await getSSRTaskServiceClient()
-  try {
-    await taskApiClient.updateTask(task.userId, task._id, { completed: !task.completed })
-    refresh()
-    return { ...task, completed: !task.completed }
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return { error: true, message: error.message } as ApiErrorResponse
-    }
-    return { error: true, message: coalesceErrorMsg(error, 'Internal Server Error') }
-  }
-}
 
 export async function deleteTask(userId: string, taskId: string) {
   const taskApiClient = await getSSRTaskServiceClient()

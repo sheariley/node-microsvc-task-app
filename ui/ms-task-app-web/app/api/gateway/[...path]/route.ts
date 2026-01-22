@@ -18,6 +18,7 @@ import {
   setXForwardedHeaders,
 } from '@/lib/api-routing'
 import { serviceRoutes } from './service-routes'
+import serverLogger from '@/lib/logging/server-logger'
 
 let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
 
@@ -39,8 +40,6 @@ const proxyRequest = auth(async req => {
     return NextResponse.json({ error: true, message: 'Unauthorized' }, { status: 401 })
   }
 
-  console.log('testing 123')
-
   const urlObj = new URL(req.url)
   const prefix = '/api/gateway'
   const forwardPath = urlObj.pathname.startsWith(prefix)
@@ -50,7 +49,7 @@ const proxyRequest = auth(async req => {
   let targetBase: string
   try {
     const resolved = await gatewaySvcResolver.resolve(forwardPath || '/', req)
-    console.info('API gateway route matched', { from: forwardPath || '/', to: resolved.target })
+    serverLogger.info({ from: forwardPath || '/', to: resolved.target }, 'API gateway route matched')
     targetBase = resolved.target
   } catch (err) {
     const message = coalesceErrorMsg(err, 'Internal gateway routing error')

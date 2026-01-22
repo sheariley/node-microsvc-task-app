@@ -1,5 +1,9 @@
 import { FetchInstrumentation } from '@vercel/otel'
-import { getMinimalInstrumentations, startInstrumentation } from 'ms-task-app-telemetry'
+import {
+  getMinimalInstrumentations,
+  SamplerWithIgnoredRoutes,
+  startInstrumentation,
+} from 'ms-task-app-telemetry'
 
 import { OAuthServiceBaseUrl, TaskServiceBaseUrl } from './lib/api-routing/service-base-urls'
 
@@ -13,4 +17,5 @@ startInstrumentation({
       propagateContextUrls: [TaskServiceBaseUrl, OAuthServiceBaseUrl],
     }),
   ],
+  sampler: new SamplerWithIgnoredRoutes(['/ping', '/api/log']),
 })
