@@ -1,5 +1,6 @@
+import type { ServerResponse } from 'http'
 import { getServerConfig } from 'ms-task-app-common'
-import { createPinoOtelEventLogger } from 'ms-task-app-telemetry/logging'
+import { createPinoOtelEventLogger, minResponseSerializer } from 'ms-task-app-telemetry/logging'
 import pino from 'pino'
 
 const serverEnv = getServerConfig()
@@ -15,6 +16,9 @@ export default createPinoOtelEventLogger(
         // output to log file
         { target: 'pino/file', options: { destination: serverEnv.taskSvc.logPath } },
       ],
+    },
+    serializers: {
+      res: minResponseSerializer
     },
   })
 )

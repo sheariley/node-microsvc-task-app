@@ -99,6 +99,7 @@ async function main() {
       app.use(
         pinoHttp({
           logger,
+          wrapSerializers: false,
           autoLogging: {
             ignore: req => req.url.includes('/ping'),
           },
