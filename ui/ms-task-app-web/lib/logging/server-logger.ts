@@ -1,5 +1,3 @@
-//import 'server-only'
-
 import { getServerConfig } from 'ms-task-app-common'
 import { createPinoOtelEventLogger } from 'ms-task-app-telemetry'
 import pino from 'pino'

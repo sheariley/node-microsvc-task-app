@@ -1,18 +1,15 @@
 'use client'
 
-import { Button } from '@/app/components/ui'
 import { signIn, signOut, useSession } from 'next-auth/react'
 
-//import { initiateSignIn, initiateSignOut } from '@/server-actions/auth'
+import { Button } from '@/app/components/ui'
 
 export function SignInButton() {
   const { data: session } = useSession()
 
   if (!session?.user) {
     return (
-      <form
-        action={() => signIn()}
-      >
+      <form action={() => signIn()}>
         <Button type="submit" color="primary" variant="flat">
           Sign In/Up
         </Button>
@@ -21,9 +18,7 @@ export function SignInButton() {
   }
 
   return (
-    <form
-      action={() => signOut()}
-    >
+    <form action={() => signOut()}>
       <Button type="submit" color="primary" variant="flat">
         Sign Out
       </Button>

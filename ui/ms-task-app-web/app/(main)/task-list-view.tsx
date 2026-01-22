@@ -1,7 +1,8 @@
-import { TaskList } from '@/app/components/task-list/task-list'
+import { RocketIcon } from 'lucide-react'
+
+import { TaskList } from '@/app/components/task-list/task-list.client'
 import { Button, Link } from '@/app/components/ui'
 import { getSSRTaskServiceClient } from '@/lib/api-clients/ssr'
-import { RocketIcon } from 'lucide-react'
 
 type TaskListViewProps = {
   userId: string

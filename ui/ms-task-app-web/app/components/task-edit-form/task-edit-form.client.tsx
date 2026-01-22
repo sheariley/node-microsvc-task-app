@@ -1,8 +1,5 @@
 'use client'
 
-import { Button, Checkbox, Form, Input, Textarea, addToast } from '@/app/components/ui'
-import { useTaskServiceClient } from '@/lib/api-clients/task-service-client'
-import { cn } from '@/lib/ui-helpers'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { OctagonAlertIcon, SaveIcon, ThumbsUpIcon, XIcon } from 'lucide-react'
 import { coalesceErrorMsg } from 'ms-task-app-common'
@@ -11,6 +8,11 @@ import { useRouter } from 'next/navigation'
 import React from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
+import { Button, Checkbox, Form, Input, Textarea, addToast } from '@/app/components/ui'
+import { useTaskServiceClient } from '@/lib/api-clients/task-service-client'
+import clientLogger from '@/lib/logging/client-logger'
+import { cn } from '@/lib/ui-helpers'
+
 type Props = Omit<React.ComponentProps<typeof Form>, 'onSubmit' | 'onSubmitted'> & {
   task?: TaskDto | TaskInputDto
   userId: string
@@ -18,7 +20,14 @@ type Props = Omit<React.ComponentProps<typeof Form>, 'onSubmit' | 'onSubmitted'>
   onSubmitted?: (task: TaskDto | TaskInputDto) => void | Promise<void>
 }
 
-export default function TaskEditForm({ task, userId, inline, onSubmitted, className, ...formProps }: Props) {
+export default function TaskEditForm({
+  task,
+  userId,
+  inline,
+  onSubmitted,
+  className,
+  ...formProps
+}: Props) {
   const router = useRouter()
   const taskClient = useTaskServiceClient()
 
@@ -64,7 +73,7 @@ export default function TaskEditForm({ task, userId, inline, onSubmitted, classN
         }
       }
     } catch (err) {
-      console.error('Failed to save task', err)
+      clientLogger.error(err, 'Failed to save task')
       addToast({
         title: 'Failed to save task!',
         description: coalesceErrorMsg(err),
@@ -111,31 +120,33 @@ export default function TaskEditForm({ task, userId, inline, onSubmitted, classN
               errorMessage={() => error?.message}
               disabled={isSubmitting}
               endContent={
-                !inline ? undefined : (<>
-                  <Button
-                    type="button"
-                    className="mr-2 text-neutral-400 hover:text-foreground hover:bg-content2"
-                    color="default"
-                    variant="flat"
-                    size="sm"
-                    isIconOnly
-                    title="Clear"
-                    onPress={() => resetForm()}
-                  >
-                    <XIcon />
-                  </Button>
+                !inline ? undefined : (
+                  <>
+                    <Button
+                      type="button"
+                      className="hover:text-foreground hover:bg-content2 mr-2 text-neutral-400"
+                      color="default"
+                      variant="flat"
+                      size="sm"
+                      isIconOnly
+                      title="Clear"
+                      onPress={() => resetForm()}
+                    >
+                      <XIcon />
+                    </Button>
 
-                  <Button
-                    type="submit"
-                    color="primary"
-                    disabled={isSubmitting}
-                    size="sm"
-                    className="px-0 gap-0 sm:px-3 sm:gap-2 sm:[&>svg]:max-w-8"
-                  >
-                    <SaveIcon size="20" />
-                    <span className="hidden sm:inline"> Save</span>
-                  </Button>
-                </>)
+                    <Button
+                      type="submit"
+                      color="primary"
+                      disabled={isSubmitting}
+                      size="sm"
+                      className="gap-0 px-0 sm:gap-2 sm:px-3 sm:[&>svg]:max-w-8"
+                    >
+                      <SaveIcon size="20" />
+                      <span className="hidden sm:inline"> Save</span>
+                    </Button>
+                  </>
+                )
               }
             />
           </>

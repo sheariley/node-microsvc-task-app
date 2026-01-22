@@ -1,8 +1,8 @@
 'use client'
 
+import { SignInButton } from '@/app/components/auth'
+import { Logo } from '@/app/components/logo/logo'
 import { Link, Navbar, NavbarBrand, NavbarContent, NavbarItem } from '@/app/components/ui'
-import { SignInButton } from '../components/auth'
-import { Logo } from '../components/logo/logo'
 
 export default function MainLayout({
   children,

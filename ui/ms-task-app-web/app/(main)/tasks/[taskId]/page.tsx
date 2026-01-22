@@ -1,10 +1,12 @@
+import { coalesceErrorMsg } from 'ms-task-app-common'
+import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
+import { redirect } from 'next/navigation'
+
 import TaskEditForm from '@/app/components/task-edit-form/task-edit-form.client'
 import { Alert } from '@/app/components/ui'
 import { auth } from '@/auth'
 import { getSSRTaskServiceClient } from '@/lib/api-clients/ssr'
-import { coalesceErrorMsg } from 'ms-task-app-common'
-import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
-import { redirect } from 'next/navigation'
+import serverLogger from '@/lib/logging/server-logger'
 
 type TaskDetailPageProps = {
   params: Promise<{ taskId: string }>
@@ -30,7 +32,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
       const taskApiClient = await getSSRTaskServiceClient()
       task = await taskApiClient.getUserTaskById(session.user.id!, taskId)
     } catch (err) {
-      console.error('Failed to fetch task', err)
+      serverLogger.error(err, 'Failed to fetch task')
       fetchError = coalesceErrorMsg(err)
     }
   }

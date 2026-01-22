@@ -1,1 +1,1 @@
-export * from './signin-button'
+export * from './signin-button.client'

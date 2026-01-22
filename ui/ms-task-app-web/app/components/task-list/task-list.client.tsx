@@ -1,26 +1,6 @@
 'use client'
 
 import {
-  addToast,
-  Button,
-  ButtonGroup,
-  Checkbox,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Spinner,
-  useDisclosure,
-} from '@/app/components/ui'
-import { cn } from '@/lib/ui-helpers'
-import { toggleArrayValue } from '@/lib/util'
-import {
-  completeTasks,
-  deleteTasks,
-  uncompleteTasks,
-} from '@/server-actions/task-crud'
-import {
   CheckCheckIcon,
   CheckIcon,
   OctagonAlertIcon,
@@ -33,9 +13,30 @@ import { coalesceErrorMsg } from 'ms-task-app-common'
 import { ApiErrorResponse, isApiErrorResponse, TaskDto } from 'ms-task-app-dto'
 import { useRouter } from 'next/navigation'
 import React from 'react'
-import TaskEditForm from '../task-edit-form/task-edit-form.client'
-import { TaskListItem } from '../task-list-item/task-list-item'
+
+import {
+  addToast,
+  Button,
+  ButtonGroup,
+  Checkbox,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Spinner,
+  useDisclosure,
+} from '@/app/components/ui'
 import clientLogger from '@/lib/logging/client-logger'
+import { cn } from '@/lib/ui-helpers'
+import { toggleArrayValue } from '@/lib/util'
+import {
+  completeTasks,
+  deleteTasks,
+  uncompleteTasks,
+} from '@/server-actions/task-crud'
+import TaskEditForm from '@/app/components/task-edit-form/task-edit-form.client'
+import { TaskListItem } from '@/app/components/task-list-item/task-list-item.client'
 
 export type TaskListProps = React.ComponentProps<'div'> & {
   userId: string

@@ -1,8 +1,11 @@
-import { Button, Link, Spinner } from '@/app/components/ui'
-import { cn } from '@/lib/ui-helpers'
+'use client'
+
 import { CheckIcon } from 'lucide-react'
 import { TaskDto } from 'ms-task-app-dto'
 import React from 'react'
+
+import { Button, Link, Spinner } from '@/app/components/ui'
+import { cn } from '@/lib/ui-helpers'
 
 export type TaskListItemProps = React.ComponentProps<'div'> & {
   task: TaskDto
@@ -11,18 +14,28 @@ export type TaskListItemProps = React.ComponentProps<'div'> & {
   onToggleCompleted: () => unknown
 }
 
-export function TaskListItem({ task, togglingCompleted, onToggleCompleted, disabled = false, className, ...props }: TaskListItemProps) {
+export function TaskListItem({
+  task,
+  togglingCompleted,
+  onToggleCompleted,
+  disabled = false,
+  className,
+  ...props
+}: TaskListItemProps) {
   const toggleCompleteButtonHelpText = task.completed
     ? 'Completed (press to mark as incomplete)'
     : 'Not completed (press to mark as completed)'
 
   return (
-    <div {...props} className={cn('flex items-center gap-3 overflow-hidden select-none', className)}>
+    <div
+      {...props}
+      className={cn('flex items-center gap-3 overflow-hidden select-none', className)}
+    >
       <Link
         href={`/tasks/${task._id}`}
         title={`${task.title}\n${task.description}` || undefined}
         isDisabled={disabled || togglingCompleted}
-        className={cn('text-foreground leading-none flex-1 cursor-pointer truncate', {
+        className={cn('text-foreground flex-1 cursor-pointer truncate leading-none', {
           'text-neutral-500': disabled,
           'line-through': task.completed,
         })}
