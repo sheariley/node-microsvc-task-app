@@ -1,12 +1,8 @@
 import './instrumentation.ts'
 
-import {
-  coalesceErrorMsg,
-  getServerConfig,
-  redactedServerConfig,
-  type TaskAppServerConfig,
-} from 'ms-task-app-common'
-import { UserModel } from 'ms-task-app-entities'
+import otel from '@opentelemetry/api'
+import { getServerConfig, redactedServerConfig, type TaskAppServerConfig } from 'ms-task-app-common'
+import { getUserModel } from 'ms-task-app-entities'
 import {
   connectMongoDbWithRetry,
   connectMQWithRetry,
@@ -14,11 +10,10 @@ import {
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
+import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import nodemailer from 'nodemailer'
-import otel from '@opentelemetry/api'
 
 import logger from './lib/logger.ts'
-import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 
 // Server settings
 const serviceName = 'notification-service'
@@ -88,6 +83,8 @@ async function main() {
         process.exit(1)
       }
 
+      const userModel = getUserModel()
+
       const mailTransport = await tracer.startActiveSpan(
         'mail-transport-init',
         async mailTransInitSpan => {
@@ -104,7 +101,7 @@ async function main() {
             const payload: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
             logger.info({ payload }, 'Notification: TASK CREATED: ')
 
-            const user = await UserModel.findOne().where('_id').equals(payload.userId)
+            const user = await userModel.findOne().where('_id').equals(payload.userId)
 
             if (!user) {
               throw new Error(
@@ -155,7 +152,7 @@ async function main() {
             const payload: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
             logger.info({ payload }, 'Notification: TASK UPDATED: ')
 
-            const user = await UserModel.findOne().where('_id').equals(payload.userId)
+            const user = await userModel.findOne().where('_id').equals(payload.userId)
 
             if (!user) {
               throw new Error(
@@ -206,7 +203,7 @@ async function main() {
             const payload: AccountLinkedQueueMessage = JSON.parse(msg.content.toString())
             logger.info({ payload }, 'Notification: ACCOUNT LINKED: ')
 
-            const user = await UserModel.findOne().where('_id').equals(payload.userId)
+            const user = await userModel.findOne().where('_id').equals(payload.userId)
 
             if (!user) {
               throw new Error(

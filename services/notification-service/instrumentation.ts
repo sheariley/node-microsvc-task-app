@@ -1,6 +1,6 @@
 import {
   getMicroServiceInstrumentations,
-  OmitHealthCheckSampler,
+  SamplerWithIgnoredRoutes,
   startInstrumentation,
 } from 'ms-task-app-telemetry'
 
@@ -9,5 +9,5 @@ startInstrumentation({
   serviceVersion: '1.0.0',
   useBatchSpanProcessor: process.env.NODE_ENV === 'production',
   instrumentations: getMicroServiceInstrumentations(),
-  sampler: new OmitHealthCheckSampler(),
+  sampler: new SamplerWithIgnoredRoutes(),
 })

@@ -48,6 +48,8 @@
     { "path": "./packages/ms-task-app-common" },
     { "path": "./packages/ms-task-app-dto" },
     { "path": "./packages/ms-task-app-entities" },
-    { "path": "./packages/ms-task-app-service-util" }
+    { "path": "./packages/ms-task-app-mtls" },
+    { "path": "./packages/ms-task-app-service-util" },
+    { "path": "./packages/ms-task-app-telemetry" }
   ]
 }

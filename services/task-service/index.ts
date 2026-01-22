@@ -8,19 +8,9 @@ import fs from 'fs'
 import https from 'https'
 import mongoose from 'mongoose'
 import { checkClientCert } from 'ms-task-app-auth'
-import {
-  coalesceErrorMsg,
-  getServerConfig,
-  redactedServerConfig,
-  type JsonValue,
-} from 'ms-task-app-common'
-import {
-  mapDtoValidationErrors,
-  TaskInputDtoSchema,
-  type ApiErrorResponse,
-  type TaskInputDto,
-} from 'ms-task-app-dto'
-import { TaskModel } from 'ms-task-app-entities'
+import { getServerConfig, redactedServerConfig, type JsonValue } from 'ms-task-app-common'
+import { TaskInputDtoSchema, type ApiErrorResponse, type TaskInputDto } from 'ms-task-app-dto'
+import { getTaskModel } from 'ms-task-app-entities'
 import {
   connectMongoDbWithRetry,
   connectMQWithRetry,
@@ -34,8 +24,8 @@ import {
 } from 'ms-task-app-service-util'
 import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import { pinoHttp } from 'pino-http'
-
 import type { ParsedQs } from 'qs'
+
 import { authenticatedUser } from './lib/authenticated-user.ts'
 import type { BulkOpLocals, Locals } from './lib/express-types.ts'
 import logger from './lib/logger.ts'
@@ -152,6 +142,8 @@ async function main() {
         process.exit(1)
       }
 
+      const taskModel = getTaskModel()
+
       if (serverEnv.disableInternalMtls) {
         logger.warn('Running without mTLS.')
       } else {
@@ -206,7 +198,7 @@ async function main() {
               return res.status(403).json({ error: true, message: 'Unauthorized' })
             }
 
-            const tasks = await TaskModel.find().where('userId').equals(userId)
+            const tasks = await taskModel.find().where('userId').equals(userId)
             res.status(200).json(tasks)
           })
       )
@@ -235,7 +227,8 @@ async function main() {
                 return res.status(403).json({ error: true, message: 'Unauthorized' })
               }
 
-              const task = await TaskModel.findById(req.params.taskId)
+              const task = await taskModel
+                .findById(req.params.taskId)
                 .where('userId')
                 .equals(req.params.userId)
               if (!task) {
@@ -283,7 +276,7 @@ async function main() {
 
               const { title, description, completed } = req.body as TaskInputDto
 
-              const task = new TaskModel({
+              const task = new taskModel({
                 userId,
                 title,
                 description,
@@ -352,7 +345,7 @@ async function main() {
                 return res.status(403).json({ error: true, message: 'Unauthorized' })
               }
 
-              const { matchedCount, modifiedCount } = await TaskModel.updateMany(
+              const { matchedCount, modifiedCount } = await taskModel.updateMany(
                 {
                   userId,
                   _id: res.locals.taskIds,
@@ -420,11 +413,8 @@ async function main() {
             }
 
             const { title, description, completed } = req.body as Partial<TaskInputDto>
-            const task = await TaskModel.findByIdAndUpdate(
-              taskId,
-              { title, description, completed },
-              { new: true }
-            )
+            const task = await taskModel
+              .findByIdAndUpdate(taskId, { title, description, completed }, { new: true })
               .where('userId')
               .equals(userId)
 
@@ -481,7 +471,7 @@ async function main() {
                 return res.status(403).json({ error: true, message: 'Unauthorized' })
               }
 
-              const task = await TaskModel.findByIdAndDelete(taskId).where('userId').equals(userId)
+              const task = await taskModel.findByIdAndDelete(taskId).where('userId').equals(userId)
 
               if (!task) {
                 return res.status(404).json({ error: true, message: 'Task not found' })
@@ -533,7 +523,7 @@ async function main() {
                 return res.status(403).json({ error: true, message: 'Unauthorized' })
               }
 
-              const deleteResult = await TaskModel.deleteMany({
+              const deleteResult = await taskModel.deleteMany({
                 userId,
                 _id: res.locals.taskIds,
               })
