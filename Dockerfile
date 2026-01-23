@@ -109,8 +109,6 @@ COPY --from=build_base /repo/package*.json ./
 USER root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --ingroup nodejs --uid 1001 svc
-
-# TODO: Figure out how to get write access to the logs dir
 RUN mkdir -p /run/logs
 RUN chown -R 1001:1001 /run/logs
 
