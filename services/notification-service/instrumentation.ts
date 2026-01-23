@@ -1,3 +1,4 @@
+import { ParentBasedSampler } from '@opentelemetry/sdk-trace-base'
 import {
   getMicroServiceInstrumentations,
   SamplerWithIgnoredRoutes,
@@ -9,5 +10,5 @@ startInstrumentation({
   serviceVersion: '1.0.0',
   useBatchSpanProcessor: process.env.NODE_ENV === 'production',
   instrumentations: getMicroServiceInstrumentations(),
-  sampler: new SamplerWithIgnoredRoutes(),
+  sampler: new ParentBasedSampler({ root: new SamplerWithIgnoredRoutes() }),
 })

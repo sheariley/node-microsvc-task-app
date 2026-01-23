@@ -1,3 +1,4 @@
+import { ParentBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { FetchInstrumentation } from '@vercel/otel'
 import {
   getMinimalInstrumentations,
@@ -5,7 +6,7 @@ import {
   startInstrumentation,
 } from 'ms-task-app-telemetry'
 
-import { OAuthServiceBaseUrl, TaskServiceBaseUrl } from './lib/api-routing/service-base-urls'
+import { OAuthServiceBaseUrl, TaskServiceBaseUrl } from '@/lib/api-routing/service-base-urls'
 
 startInstrumentation({
   serviceName: 'web-ui',
@@ -15,7 +16,8 @@ startInstrumentation({
     ...getMinimalInstrumentations(),
     new FetchInstrumentation({
       propagateContextUrls: [TaskServiceBaseUrl, OAuthServiceBaseUrl],
+      ignoreUrls: ['/ping', '/api/log'],
     }),
   ],
-  sampler: new SamplerWithIgnoredRoutes(['/ping', '/api/log']),
+  sampler: new ParentBasedSampler({ root: new SamplerWithIgnoredRoutes(['/ping', '/api/log']) }),
 })

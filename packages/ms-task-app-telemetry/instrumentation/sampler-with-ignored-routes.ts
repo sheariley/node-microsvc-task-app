@@ -1,23 +1,50 @@
-import { type Attributes, type Context, SpanKind } from '@opentelemetry/api'
-import { type Sampler, SamplingDecision, type SamplingResult } from '@opentelemetry/sdk-trace-base'
+import { type Attributes, type Context, type Link, SpanKind } from '@opentelemetry/api'
+import {
+  AlwaysOnSampler,
+  type Sampler,
+  SamplingDecision,
+  type SamplingResult
+} from '@opentelemetry/sdk-trace-base'
+import { ATTR_HTTP_TARGET } from '@opentelemetry/semantic-conventions/incubating'
 
 export class SamplerWithIgnoredRoutes implements Sampler {
-  constructor(private ignoredRoutes: string[] = ['/ping']) {}
+  constructor(
+    private ignoredRoutes: string[] = ['/ping'],
+    private delegate?: Sampler
+  ) {
+    if (!this.delegate)
+      this.delegate = new AlwaysOnSampler()
+  }
 
   shouldSample(
     _context: Context,
     _traceId: string,
     _spanName: string,
     _spanKind: SpanKind,
-    attributes: Attributes
+    attributes: Attributes,
+    _links: Link[]
   ): SamplingResult {
-    return {
-      decision:
-        !!attributes['http.target'] &&
-        this.ignoredRoutes.includes(attributes['http.target'].toString())
-          ? SamplingDecision.NOT_RECORD
-          : SamplingDecision.RECORD_AND_SAMPLED,
+    if (
+      attributes &&
+      attributes[ATTR_HTTP_TARGET] &&
+      this.ignoredRoutes.some(route => attributes[ATTR_HTTP_TARGET]!.toString().startsWith(route))
+    ) {
+      return { decision: SamplingDecision.NOT_RECORD }
     }
+
+    // fallback to delegate
+    if (this.delegate) {
+      return this.delegate.shouldSample(
+        _context,
+        _traceId,
+        _spanName,
+        _spanKind,
+        attributes,
+        _links
+      )
+    }
+
+    return { decision: SamplingDecision.RECORD_AND_SAMPLED }
   }
 
   toString(): string {
