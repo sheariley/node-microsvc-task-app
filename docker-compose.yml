@@ -44,10 +44,11 @@ services:
     entrypoint: ["/usr/share/opensearch/custom-entrypoint.sh"]
     healthcheck:
       test: [ "CMD-SHELL", "curl -k -u \"admin:$OPENSEARCH__ADMIN_PASS\" --cert /run/secrets/opensearch.cert.pem --key /run/secrets/opensearch.key.pem --silent --fail \"https://localhost:9200/_cluster/health?local=true\" || exit 1" ]
-      interval: 10s
+      interval: 30s
       timeout: 10s
       retries: 30
       start_period: 30s
+    restart: unless-stopped
 
   opensearch-dashboards:
     # Make sure the version of opensearch-dashboards matches the version of opensearch installed on other nodes
@@ -75,6 +76,7 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
+    restart: unless-stopped
 
   jaeger:
     container_name: jaeger
@@ -222,6 +224,7 @@ services:
     ports:
       - "${OAUTH_SVC__PORT}:3001"
     environment:
+      - OAUTH_SVC__LOG_PATH=${OAUTH_SVC__LOG_PATH}
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
       - RABBITMQ__HOST=${RABBITMQ__HOST}
@@ -232,6 +235,8 @@ services:
       - OAUTH_SVC__CERT_PATH=/run/secrets/oauth-service.cert.pem
       - OAUTH_SVC__KEY_CERT_COMBO_PATH=/run/secrets/oauth-service.pem
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+    volumes:
+      - service_logs:/run/logs
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -249,8 +254,18 @@ services:
       dockerfile: ./Dockerfile
       target: runtime_oauth_service
     depends_on:
-      - mongo
-      - jaeger
+      mongo:
+        condition: service_started
+      jaeger:
+        condition: service_started
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -k --cert /run/secrets/oauth-service.cert.pem --key /run/secrets/oauth-service.key.pem --silent --fail \"https://localhost:3001/ping\" || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   task-service:
@@ -261,6 +276,7 @@ services:
     ports:
       - "${TASK_SVC__PORT}:3002"
     environment:
+      - TASK_SVC__LOG_PATH=${TASK_SVC__LOG_PATH}
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
       - RABBITMQ__HOST=${RABBITMQ__HOST}
@@ -277,6 +293,8 @@ services:
       - TASK_SVC__CERT_PATH=/run/secrets/task-service.cert.pem
       - TASK_SVC__KEY_CERT_COMBO_PATH=/run/secrets/task-service.pem
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+    volumes:
+      - service_logs:/run/logs
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -294,9 +312,20 @@ services:
       dockerfile: ./Dockerfile
       target: runtime_task_service
     depends_on:
-      - mongo
-      - rabbitmq
-      - jaeger
+      mongo:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      jaeger:
+        condition: service_started
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -k --cert /run/secrets/task-service.cert.pem --key /run/secrets/task-service.key.pem --silent --fail \"https://localhost:3002/ping\" || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   notification-service:
@@ -305,6 +334,7 @@ services:
     networks:
       - backend
     environment:
+      - NOTIFY_SVC__LOG_PATH=${NOTIFY_SVC__LOG_PATH}
       - NOTIFY_SVC__FROM_EMAIL=noreply@notification-service.local
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
@@ -322,6 +352,8 @@ services:
       - NOTIFY_SVC__CERT_PATH=/run/secrets/notification-service.cert.pem
       - NOTIFY_SVC__KEY_CERT_COMBO_PATH=/run/secrets/notification-service.pem
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+    volumes:
+      - service_logs:/run/logs
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -339,10 +371,16 @@ services:
       dockerfile: ./Dockerfile
       target: runtime_notification_service
     depends_on:
-      - mongo
-      - rabbitmq
-      - smtp-server
-      - jaeger
+      mongo:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      smtp-server:
+        condition: service_started
+      jaeger:
+        condition: service_started
+      init-volumes:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   web-ui:
@@ -353,6 +391,7 @@ services:
     ports:
       - "${WEB_UI__PORT}:3000"
     environment:
+      - WEB_UI__LOG_PATH=${WEB_UI__LOG_PATH}
       - WEB_UI__PORT=${WEB_UI__PORT}
       - OAUTH_SVC__PORT=${OAUTH_SVC__PORT}
       - TASK_SVC__PORT=${TASK_SVC__PORT}
@@ -366,6 +405,8 @@ services:
       - WEB_UI__CERT_PATH=/run/secrets/web-ui.cert.pem
       - WEB_UI__KEY_CERT_COMBO_PATH=/run/secrets/web-ui.pem
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+    volumes:
+      - service_logs:/run/logs
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -397,10 +438,27 @@ services:
         - source: web_ui_pem
           target: web-ui.pem
     depends_on:
-      - oauth-service
-      - task-service
-      - jaeger
+      oauth-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -k --silent --fail \"http://localhost:3000/ping\" || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
+
+  init-volumes:
+    image: busybox
+    command: sh -c "chown -R 1001:1001 /run/logs"
+    volumes:
+      - service_logs:/run/logs
 
 networks:
   backend:
@@ -411,6 +469,7 @@ volumes:
   npm_cache:
   opensearch_data:
   opensearch_setup:
+  service_logs:
 
 secrets:
   ca_cert:

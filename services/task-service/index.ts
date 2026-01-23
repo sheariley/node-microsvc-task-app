@@ -158,14 +158,16 @@ async function main() {
               }
 
               const authorized = !!clientCert && authorizedCNs.includes(clientCert.subject.CN)
-              if (authorized) {
-                logger.info(
-                  `Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`
-                )
-              } else {
-                logger.warn(
-                  `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
-                )
+              if (!req.url.startsWith('/ping')) {
+                if (authorized) {
+                  logger.info(
+                    `Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`
+                  )
+                } else {
+                  logger.warn(
+                    `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
+                  )
+                }
               }
               return authorized
             })

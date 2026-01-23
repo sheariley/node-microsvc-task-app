@@ -133,7 +133,7 @@ async function main() {
         connectMQWithRetry({
           host: serverEnv.rabbitmq.host,
           port: serverEnv.rabbitmq.port,
-          tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
+          tls: serverEnv.disableInternalMtls ? undefined : serverEnv.oauthSvc,
         })
       )
 
@@ -176,14 +176,16 @@ async function main() {
               }
 
               const authorized = !!clientCert && authorizedCNs.includes(clientCert.subject.CN)
-              if (authorized) {
-                logger.info(
-                  `Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`
-                )
-              } else {
-                logger.warn(
-                  `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
-                )
+              if (!req.url.startsWith('/ping')) {
+                if (authorized) {
+                  logger.info(
+                    `Client cert from ${clientCert.subject.CN} authorized to access ${req.url}.`
+                  )
+                } else {
+                  logger.warn(
+                    `Client cert from ${clientCert.subject.CN} NOT authorized to access ${req.url}.`
+                  )
+                }
               }
               return authorized
             })
@@ -604,9 +606,9 @@ async function main() {
         })
       } else {
         const httpsServerOptions: https.ServerOptions = {
-          key: fs.readFileSync(serverEnv.taskSvc.privateKeyPath),
-          cert: fs.readFileSync(serverEnv.taskSvc.certPath),
-          ca: fs.readFileSync(serverEnv.taskSvc.caCertPath),
+          key: fs.readFileSync(serverEnv.oauthSvc.privateKeyPath),
+          cert: fs.readFileSync(serverEnv.oauthSvc.certPath),
+          ca: fs.readFileSync(serverEnv.oauthSvc.caCertPath),
           requestCert: true, // request client cert
           rejectUnauthorized: true, // reject connections with invalid or missing client cert
         }

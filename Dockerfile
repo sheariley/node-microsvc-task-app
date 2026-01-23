@@ -92,6 +92,9 @@ RUN npm run build:service-util
 FROM node:24-alpine AS runtime_base
 WORKDIR /app
 
+# Install sys deps
+RUN apk add --no-cache curl
+
 # Copy build artifacts
 COPY --from=build_base /repo/packages/ms-task-app-common ./packages/ms-task-app-common
 COPY --from=build_base /repo/packages/ms-task-app-telemetry ./packages/ms-task-app-telemetry
@@ -102,6 +105,14 @@ COPY --from=build_base /repo/packages/ms-task-app-auth ./packages/ms-task-app-au
 COPY --from=build_base /repo/packages/ms-task-app-service-util ./packages/ms-task-app-service-util
 
 COPY --from=build_base /repo/package*.json ./
+
+USER root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --ingroup nodejs --uid 1001 svc
+
+# TODO: Figure out how to get write access to the logs dir
+RUN mkdir -p /run/logs
+RUN chown -R 1001:1001 /run/logs
 
 
 # ===============================
@@ -142,6 +153,8 @@ COPY --from=build_oauth_service /repo/services/${SVC_NAME}/package.json ./servic
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
 EXPOSE ${OAUTH_SVC_PORT}
+
+USER svc
 
 # Run server
 CMD ["sh", "-c", "node --loader @opentelemetry/instrumentation/hook.mjs /app/services/${SVC_NAME}/dist/index.js"]
@@ -187,6 +200,8 @@ RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no
 
 EXPOSE ${TASK_SVC_PORT}
 
+USER svc
+
 # Run server
 CMD ["sh", "-c", "node --loader @opentelemetry/instrumentation/hook.mjs /app/services/${SVC_NAME}/dist/index.js"]
 
@@ -228,6 +243,8 @@ COPY --from=build_notification_service /repo/services/${SVC_NAME}/package.json .
 # Install runtime pkg depends
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
+USER svc
+
 # Run server
 CMD ["sh", "-c", "node --loader @opentelemetry/instrumentation/hook.mjs /app/services/${SVC_NAME}/dist/index.js"]
 
@@ -268,24 +285,21 @@ ARG WEB_UI_PORT=3000 OAUTH_SVC_PORT=3001 TASK_SVC_PORT=3002
 ENV NODE_ENV=production
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
 COPY --from=build_web_ui /repo/package*.json ./
 
 COPY --from=build_web_ui /repo/ui/ms-task-app-web/package.json ./ui/ms-task-app-web/
 
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=build_web_ui /repo/ui/ms-task-app-web/.next/standalone/node_modules* ./ui/ms-task-app-web/.next/standalone/node_modules
+# Temporary fix for https://github.com/vercel/next.js/issues/86099
+COPY --from=build_web_ui /repo/node_modules/pino/lib ./ui/ms-task-app-web/.next/standalone/node_modules/pino/lib
 COPY --from=build_web_ui --chown=nextjs:nodejs /repo/ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web ./ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web
 COPY --from=build_web_ui --chown=nextjs:nodejs /repo/ui/ms-task-app-web/.next/static ./ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web/.next/static
 COPY --from=build_web_ui /repo/ui/ms-task-app-web/public* ./ui/ms-task-app-web/.next/standalone/ui/ms-task-app-web/public
 
-# Run server as nexjs user
-USER nextjs
+# Run server as svc user
+USER svc
 
 EXPOSE ${WEB_UI_PORT}
 
