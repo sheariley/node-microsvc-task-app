@@ -1,2 +1,3 @@
 export * from './log-serializers.ts'
-export * from './otel-span-event-proxy.ts'
+export * from './base-logger.ts'
+export * from './pino-logger.ts'

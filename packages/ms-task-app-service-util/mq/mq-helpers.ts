@@ -1,6 +1,7 @@
 import amqp from 'amqplib'
 import fs from 'fs'
-import { wait } from 'ms-task-app-common'
+import { coalesceError, wait } from 'ms-task-app-common'
+import { DefaultConsoleLogger, type ILogger } from 'ms-task-app-telemetry'
 
 export type MqConnectOptions = {
   host: string
@@ -13,6 +14,7 @@ export type MqConnectOptions = {
     certPath: string
     privateKeyPath: string
   }
+  logger?: ILogger
 }
 
 export async function connectMQWithRetry({
@@ -22,12 +24,13 @@ export async function connectMQWithRetry({
   delay = 3000,
   initialDelay = 7000,
   tls,
+  logger = DefaultConsoleLogger,
 }: MqConnectOptions) {
   if (retries <= 0) throw new Error(`Invalid argument value: retries = ${retries}`)
   if (delay <= 0) throw new Error(`Invalid argument value: delay = ${delay}`)
 
   if (initialDelay) {
-    console.log('Waiting for MQ server to start...')
+    logger.info('Waiting for MQ server to start...')
     // give the MQ server time to start
     await wait(initialDelay)
   }
@@ -48,7 +51,7 @@ export async function connectMQWithRetry({
     // wait for specified delay
     await wait(delay)
     try {
-      console.log(`Connecting to RabbitMQ at ${uri}...`)
+      logger.info(`Connecting to RabbitMQ at ${uri}...`)
       const mqConnection = await amqp.connect(
         {
           hostname: host,
@@ -57,15 +60,15 @@ export async function connectMQWithRetry({
         },
         socketOptions
       )
-      console.log('Connected to RabbitMQ server. Opening channel...')
+      logger.info('Connected to RabbitMQ server. Opening channel...')
       const mqChannel = await mqConnection.createChannel()
-      console.log('RabbitMQ connected and channel opened.')
+      logger.info('RabbitMQ connected and channel opened.')
       return { mqConnection, mqChannel, error: null }
     } catch (error) {
-      console.log('RabbitMQ Connection Error: ', error)
+      logger.info('RabbitMQ Connection Error: ', coalesceError(error))
       retries--
       if (retries > 0) {
-        console.log('Retrying connection. Retries left: ', retries)
+        logger.info('Retrying connection. Retries left: ', retries)
       } else {
         return { mqConnection: null, mqChannel: null, error }
       }

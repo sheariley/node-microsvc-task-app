@@ -1,3 +1,12 @@
+export enum LogLevel {
+  fatal = 'fatal',
+  error = 'error',
+  warn = 'warn',
+  info = 'info',
+  debug = 'debug',
+  trace = 'trace'
+}
+
 export type ServiceCertConfig = {
   privateKeyPath: string
   certPath: string
@@ -7,7 +16,7 @@ export type ServiceCertConfig = {
 
 export type ServiceConfig = ServiceCertConfig & {
   logPath: string
-  logLevel: string
+  logLevel: LogLevel
 }
 
 export type WebServiceConfig = ServiceConfig & {
@@ -90,7 +99,7 @@ export function getServerConfig(): TaskAppServerConfig {
 
     webUi: {
       logPath: process.env.WEB_UI__LOG_PATH ?? CONFIG_DEFAULTS.webUi.logPath,
-      logLevel: process.env.WEB_UI__LOG_LEVEL ?? CONFIG_DEFAULTS.webUi.logLevel,
+      logLevel: coerceLogLevel(process.env.WEB_UI__LOG_LEVEL, CONFIG_DEFAULTS.webUi.logLevel),
       host: process.env.WEB_UI__HOST ?? CONFIG_DEFAULTS.webUi.host,
       port: Number(process.env.WEB_UI__PORT ?? CONFIG_DEFAULTS.webUi.port),
       privateKeyPath: process.env.WEB_UI__PRIVATE_KEY_PATH ?? CONFIG_DEFAULTS.webUi.privateKeyPath,
@@ -102,7 +111,7 @@ export function getServerConfig(): TaskAppServerConfig {
 
     oauthSvc: {
       logPath: process.env.OAUTH_SVC__LOG_PATH ?? CONFIG_DEFAULTS.oauthSvc.logPath,
-      logLevel: process.env.OAUTH_SVC__LOG_LEVEL ?? CONFIG_DEFAULTS.oauthSvc.logLevel,
+      logLevel: coerceLogLevel(process.env.OAUTH_SVC__LOG_LEVEL, CONFIG_DEFAULTS.oauthSvc.logLevel),
       host: process.env.OAUTH_SVC__HOST ?? CONFIG_DEFAULTS.oauthSvc.host,
       port: Number(process.env.OAUTH_SVC__PORT ?? CONFIG_DEFAULTS.oauthSvc.port),
       privateKeyPath:
@@ -115,7 +124,7 @@ export function getServerConfig(): TaskAppServerConfig {
 
     taskSvc: {
       logPath: process.env.TASK_SVC__LOG_PATH ?? CONFIG_DEFAULTS.taskSvc.logPath,
-      logLevel: process.env.TASK_SVC__LOG_LEVEL ?? CONFIG_DEFAULTS.taskSvc.logLevel,
+      logLevel: coerceLogLevel(process.env.TASK_SVC__LOG_LEVEL, CONFIG_DEFAULTS.taskSvc.logLevel),
       host: process.env.TASK_SVC__HOST ?? CONFIG_DEFAULTS.taskSvc.host,
       port: Number(process.env.TASK_SVC__PORT ?? CONFIG_DEFAULTS.taskSvc.port),
       privateKeyPath:
@@ -128,7 +137,7 @@ export function getServerConfig(): TaskAppServerConfig {
 
     notifySvc: {
       logPath: process.env.NOTIFY_SVC__LOG_PATH ?? CONFIG_DEFAULTS.notifySvc.logPath,
-      logLevel: process.env.NOTIFY_SVC__LOG_LEVEL ?? CONFIG_DEFAULTS.notifySvc.logLevel,
+      logLevel: coerceLogLevel(process.env.NOTIFY_SVC__LOG_LEVEL, CONFIG_DEFAULTS.notifySvc.logLevel),
       fromEmail: process.env.NOTIFY_SVC__FROM_EMAIL ?? CONFIG_DEFAULTS.notifySvc.fromEmail,
       privateKeyPath:
         process.env.NOTIFY_SVC__PRIVATE_KEY_PATH ?? CONFIG_DEFAULTS.notifySvc.privateKeyPath,
@@ -157,6 +166,13 @@ export function redactedServerConfig(cfg: TaskAppServerConfig): TaskAppServerCon
   }
 }
 
+export function coerceLogLevel(value: string | undefined, defaultValue: LogLevel = LogLevel.info): LogLevel {
+  if (!value) return defaultValue
+  const validValues: string[] = Object.values(LogLevel)
+  if (validValues.includes(value))  return value as LogLevel
+  return defaultValue
+}
+
 const CONFIG_DEFAULTS: TaskAppServerConfig = {
   mongodb: { host: 'mongo', port: 27017 },
   rabbitmq: {
@@ -172,7 +188,7 @@ const CONFIG_DEFAULTS: TaskAppServerConfig = {
   disableInternalMtls: false,
   webUi: {
     logPath: '../../logs/web-ui.log',
-    logLevel: 'info',
+    logLevel: LogLevel.info,
     host: 'web-ui',
     port: 3000,
     privateKeyPath: '../../.certs/web-ui/web-ui.key.pem',
@@ -182,7 +198,7 @@ const CONFIG_DEFAULTS: TaskAppServerConfig = {
   },
   oauthSvc: {
     logPath: '../../logs/oauth-service.log',
-    logLevel: 'info',
+    logLevel: LogLevel.info,
     host: 'oauth-service',
     port: 3001,
     privateKeyPath: '../../.certs/oauth-service/oauth-service.key.pem',
@@ -192,7 +208,7 @@ const CONFIG_DEFAULTS: TaskAppServerConfig = {
   },
   taskSvc: {
     logPath: '../../logs/task-service.log',
-    logLevel: 'info',
+    logLevel: LogLevel.info,
     host: 'task-service',
     port: 3002,
     privateKeyPath: '../../.certs/task-service/task-service.key.pem',
@@ -202,7 +218,7 @@ const CONFIG_DEFAULTS: TaskAppServerConfig = {
   },
   notifySvc: {
     logPath: '../../logs/notification-service.log',
-    logLevel: 'info',
+    logLevel: LogLevel.info,
     fromEmail: 'noreply@notification-service.local',
     privateKeyPath: '../../.certs/notification-service/notification-service.key.pem',
     certPath: '../../.certs/notification-service/notification-service.cert.pem',

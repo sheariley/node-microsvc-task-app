@@ -1,12 +1,7 @@
-import type {
-  NextFunction,
-  ParamsDictionary,
-  Request,
-  RequestHandler,
-  Response,
-} from 'express-serve-static-core'
-import { ApiError, coalesceErrorMsg, isErrorLike, type ErrorLike } from 'ms-task-app-common'
+import type { ParamsDictionary, Request, Response } from 'express-serve-static-core'
+import { ApiError, coalesceError, coalesceErrorMsg, type ErrorLike } from 'ms-task-app-common'
 import { mapApiErrorResponse, type ApiErrorResponse } from 'ms-task-app-dto'
+import { DefaultConsoleLogger, type ILogger } from 'ms-task-app-telemetry'
 import type { ParsedQs } from 'qs'
 
 export type HandleUncaughtOptions<
@@ -26,6 +21,7 @@ export type HandleUncaughtOptions<
     req: Request<P, ResBody, ReqBody, ReqQuery, LocalsObj>,
     res: Response<ResBody, LocalsObj, number>
   ) => any
+  logger?: ILogger
 }
 
 export const DefaultErrorStatus = 500
@@ -45,6 +41,7 @@ export async function handleUncaught<
     defaultErrorStatus = DefaultErrorStatus,
     includeReason,
     beforeErrorRespond,
+    logger = DefaultConsoleLogger,
   }: HandleUncaughtOptions<P, ResBody, ReqBody, ReqQuery, LocalsObj>,
   handler: Function
 ) {
@@ -57,13 +54,13 @@ export async function handleUncaught<
     }
   } catch (error) {
     const reason = includeReason ? coalesceErrorMsg(error) : undefined
-    const coalesedError = isErrorLike(error) ? error : new Error(reason)
+    const coalesedError = coalesceError(error, reason || 'Unknown error')
     if (typeof beforeErrorRespond === 'function') {
       try {
         beforeErrorRespond(coalesedError, req, res)
       } catch {
         // swallow
-        console.warn('Error occurred during invocation of beforeErrorRespond')
+        logger.warn('Error occurred during invocation of beforeErrorRespond')
       }
     }
 

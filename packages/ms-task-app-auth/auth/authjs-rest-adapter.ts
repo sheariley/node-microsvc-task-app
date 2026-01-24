@@ -1,30 +1,37 @@
 import type {
-  AdapterAccount,
-  AdapterUser,
   Adapter,
+  AdapterAccount,
   AdapterSession,
+  AdapterUser,
   VerificationToken,
 } from '@auth/core/adapters'
 import { mapDtoValidationErrors, SessionInputDtoSchema } from 'ms-task-app-dto'
 import { createMtlsFetcher, type CreateMtlsFetcherPathOptions } from 'ms-task-app-mtls'
+import { DefaultConsoleLogger, type ILogger } from 'ms-task-app-telemetry'
 
 export type RestAdapterOptions = {
-  baseUrl: string,
+  baseUrl: string
   mtlsFetcherOptions?: CreateMtlsFetcherPathOptions
   onConfigHeaders?: (action: keyof Adapter) => Record<string, string>
+  logger?: ILogger
 }
 
 const onConfigHeadersDefault = () => {
   return {}
 }
 
-export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onConfigHeadersDefault }: RestAdapterOptions): Adapter {
+export function RestAdapter({
+  baseUrl,
+  mtlsFetcherOptions,
+  onConfigHeaders = onConfigHeadersDefault,
+  logger = DefaultConsoleLogger,
+}: RestAdapterOptions): Adapter {
   let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
   if (mtlsFetcherOptions) {
     const mtlsFetcher = createMtlsFetcher(mtlsFetcherOptions)
     _fetch = mtlsFetcher.fetch
   }
-  
+
   return {
     async createUser(data) {
       const url = `${baseUrl}/users`
@@ -34,7 +41,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...onConfigHeaders('createUser')
+          ...onConfigHeaders('createUser'),
         },
         body,
       })
@@ -53,7 +60,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'GET',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('getUser')
+          ...onConfigHeaders('getUser'),
         },
       })
 
@@ -76,7 +83,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'GET',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('getUserByEmail')
+          ...onConfigHeaders('getUserByEmail'),
         },
       })
 
@@ -100,7 +107,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'GET',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('getUserByAccount')
+          ...onConfigHeaders('getUserByAccount'),
         },
       })
 
@@ -125,7 +132,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          ...onConfigHeaders('updateUser')
+          ...onConfigHeaders('updateUser'),
         },
         body,
       })
@@ -144,7 +151,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('deleteUser')
+          ...onConfigHeaders('deleteUser'),
         },
       })
 
@@ -164,7 +171,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...onConfigHeaders('linkAccount')
+          ...onConfigHeaders('linkAccount'),
         },
         body,
       })
@@ -184,7 +191,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('unlinkAccount')
+          ...onConfigHeaders('unlinkAccount'),
         },
       })
 
@@ -202,7 +209,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'GET',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('getSessionAndUser')
+          ...onConfigHeaders('getSessionAndUser'),
         },
       })
 
@@ -226,7 +233,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...onConfigHeaders('createSession')
+          ...onConfigHeaders('createSession'),
         },
         body,
       })
@@ -243,7 +250,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
           resBody,
           validationErrors: mapDtoValidationErrors(valResult.error),
         }
-        console.error(
+        logger.error(
           'Invalid response body recieved from OAuth Rest API for createSession.',
           errorDetail
         )
@@ -263,7 +270,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          ...onConfigHeaders('updateSession')
+          ...onConfigHeaders('updateSession'),
         },
         body,
       })
@@ -282,7 +289,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('deleteSession')
+          ...onConfigHeaders('deleteSession'),
         },
       })
 
@@ -301,7 +308,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...onConfigHeaders('createVerificationToken')
+          ...onConfigHeaders('createVerificationToken'),
         },
         body,
       })
@@ -321,7 +328,7 @@ export function RestAdapter({ baseUrl, mtlsFetcherOptions, onConfigHeaders = onC
         method: 'DELETE',
         headers: {
           Accept: 'application/json',
-          ...onConfigHeaders('useVerificationToken')
+          ...onConfigHeaders('useVerificationToken'),
         },
       })
 

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 
 import logger from '@/lib/logging/server-logger'
+import { coalesceError } from 'ms-task-app-common'
 
 const handler = async (req: NextRequest) => {
   let jsonBody = ''
@@ -22,23 +23,26 @@ const handler = async (req: NextRequest) => {
         if (typeof data[0] === 'object') {
           logData = {
             ...logData,
-            ...data[0]
+            ...data[0],
           }
         } else {
           logData = {
             ...logData,
-            msg: `${data[0]}`
+            msg: `${data[0]}`,
           }
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(logger as any)[level](logData, ...data.slice(1))
+        ;(logger.pinoInstance as any)[level](logData, ...data.slice(1))
         return NextResponse.json({ error: false }, { status: 200 })
       } catch (parseError) {
-        logger.error(parseError, 'Failed to parse log message from client log request.')
+        logger.error(
+          'Failed to parse log message from client log request.',
+          coalesceError(parseError)
+        )
         return NextResponse.json({ error: true }, { status: 500 })
       }
     } catch (readError) {
-      logger.error(readError, 'Failed to read log message from client log request.')
+      logger.error('Failed to read log message from client log request.', coalesceError(readError))
       return NextResponse.json({ error: true }, { status: 500 })
     }
   }

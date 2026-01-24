@@ -10,7 +10,14 @@ import https from 'https'
 import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 import mongoose from 'mongoose'
 import { checkClientCert } from 'ms-task-app-auth'
-import { getServerConfig, redactedServerConfig, type TaskAppServerConfig } from 'ms-task-app-common'
+import {
+  coalesceError,
+  getServerConfig,
+  makeErrorSerializable,
+  redactedServerConfig,
+  type JsonValue,
+  type TaskAppServerConfig,
+} from 'ms-task-app-common'
 import {
   AccountInputDtoSchema,
   SessionInputDtoSchema,
@@ -68,7 +75,10 @@ const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond
   result,
   inputDto,
 }) => {
-  logger.warn({ validationErrors: result.validationErrors, inputDto }, result.message)
+  logger.warn(result.message, {
+    validationErrors: result.validationErrors,
+    inputDto: inputDto as JsonValue,
+  })
 }
 
 function handleErrors<
@@ -81,7 +91,7 @@ function handleErrors<
   {
     req,
     res,
-    defaultErrorMessage,
+    defaultErrorMessage = 'Unknown error',
   }: Pick<
     HandleUncaughtOptions<P, ResBody, ReqBody, ReqQuery, LocalsObj>,
     'req' | 'res' | 'defaultErrorMessage'
@@ -93,9 +103,13 @@ function handleErrors<
       req,
       res,
       includeReason: true,
+      logger,
       beforeErrorRespond: (error, req) => {
         reportExceptionIfActiveSpan(error)
-        logger.error({ error, params: req.params }, defaultErrorMessage)
+        logger.error(defaultErrorMessage, {
+          error: makeErrorSerializable(error),
+          params: req.params as JsonValue,
+        })
       },
     },
     handler
@@ -115,7 +129,7 @@ async function main() {
       app.set('etag', false)
       app.use(
         pinoHttp({
-          logger,
+          logger: logger.pinoInstance,
           wrapSerializers: false,
           autoLogging: {
             ignore: req => req.url.includes('/ping'),
@@ -134,6 +148,7 @@ async function main() {
           host: serverEnv.rabbitmq.host,
           port: serverEnv.rabbitmq.port,
           tls: serverEnv.disableInternalMtls ? undefined : serverEnv.oauthSvc,
+          logger,
         })
       )
 
@@ -287,6 +302,7 @@ async function main() {
             schema: UserDtoSchema,
             validationErrorMsg: 'Create user input validation failed',
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors({ req, res, defaultErrorMessage: 'Error creating user' }, async () => {
@@ -305,6 +321,7 @@ async function main() {
             schema: UserDtoSchema,
             validationErrorMsg: 'Update user input validation failed',
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors({ req, res, defaultErrorMessage: 'Error updating user' }, async () => {
@@ -362,6 +379,7 @@ async function main() {
             },
             validationErrorMsg: 'Link account input validation failed',
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors(
@@ -387,10 +405,10 @@ async function main() {
                   Buffer.from(JSON.stringify(accountLinkedMsg))
                 )
               } catch (mqSendErr) {
-                logger.warn(
-                  { mqSendErr, accountLinkedMsg },
-                  'Error sending account_linked message to queue'
-                )
+                logger.warn('Error sending account_linked message to queue', {
+                  mqSendErr: makeErrorSerializable(coalesceError(mqSendErr)),
+                  accountLinkedMsg,
+                })
               }
             }
           )
@@ -467,6 +485,7 @@ async function main() {
             validationErrorMsg: 'Create session input validation failed',
             onSucceed: data => (res.locals.parsedBody = data),
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors({ req, res, defaultErrorMessage: 'Error creating session' }, async () => {
@@ -486,6 +505,7 @@ async function main() {
             validationErrorMsg: 'Update session input validation failed',
             onSucceed: data => (res.locals.parsedBody = data),
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors({ req, res, defaultErrorMessage: 'Error updating session' }, async () => {
@@ -542,6 +562,7 @@ async function main() {
             validationErrorMsg: 'Create verification token input validation failed',
             onSucceed: data => (res.locals.parsedBody = data),
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors(
@@ -593,8 +614,8 @@ async function main() {
             if (error) {
               reportExceptionIfActiveSpan(error)
               logger.fatal(
-                error,
-                `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`
+                `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`,
+                error
               )
             } else {
               logger.info(`${serviceName} listening on unsecure port ${servicePort}`)
@@ -621,8 +642,8 @@ async function main() {
           .once('error', err => {
             if (!server.listening) {
               logger.fatal(
-                err,
-                `Fatal error during startup, while attempting to listen on port ${servicePort}.`
+                `Fatal error during startup, while attempting to listen on port ${servicePort}.`,
+                err
               )
               startupSpan.end()
             }
@@ -633,7 +654,7 @@ async function main() {
       if (error instanceof Error) coercedError = error
       else coercedError = new Error('Fatal exception during startup', { cause: error })
 
-      logger.fatal(coercedError, 'Fatal error during startup')
+      logger.fatal('Fatal error during startup', coercedError)
       startupSpan.recordException(coercedError)
       startupSpan.end()
       process.exit(1)

@@ -1,23 +1,9 @@
 import { getServerConfig } from 'ms-task-app-common'
-import { createPinoOtelEventLogger, minResponseSerializer } from 'ms-task-app-telemetry'
-import pino from 'pino'
+import { createPinoLogger } from 'ms-task-app-telemetry/logging'
 
 const serverEnv = getServerConfig()
 
-export default createPinoOtelEventLogger(
-  pino({
-    level: serverEnv.webUi.logLevel,
-    transport: {
-      targets: [
-        // output pretty-print to stdout
-        { target: 'pino-pretty' },
-
-        // output to log file
-        { target: 'pino/file', options: { destination: serverEnv.webUi.logPath } },
-      ],
-    },
-    serializers: {
-      res: minResponseSerializer,
-    },
-  })
-)
+export default createPinoLogger({
+  logLevel: serverEnv.webUi.logLevel,
+  logPath: serverEnv.webUi.logPath
+})

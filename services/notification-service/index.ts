@@ -1,7 +1,12 @@
 import './instrumentation.ts'
 
 import otel from '@opentelemetry/api'
-import { getServerConfig, redactedServerConfig, type TaskAppServerConfig } from 'ms-task-app-common'
+import {
+  getServerConfig,
+  makeErrorSerializable,
+  redactedServerConfig,
+  type TaskAppServerConfig,
+} from 'ms-task-app-common'
 import { getUserModel } from 'ms-task-app-entities'
 import {
   connectMongoDbWithRetry,
@@ -45,6 +50,7 @@ async function main() {
         host: serverEnv.rabbitmq.host,
         port: serverEnv.rabbitmq.port,
         tls: serverEnv.disableInternalMtls ? undefined : serverEnv.notifySvc,
+        logger,
       }))!
 
       if (mqError || !mqConnection || !mqChannel) {
@@ -73,6 +79,7 @@ async function main() {
                   tlsCAFile: serverEnv.notifySvc.caCertPath,
                   tlsCertificateKeyFile: serverEnv.notifySvc.keyCertComboPath,
                 },
+            logger,
           }))!
           mongoDbConSpan.end()
           return result
@@ -99,7 +106,7 @@ async function main() {
         if (msg) {
           try {
             const payload: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
-            logger.info({ payload }, 'Notification: TASK CREATED: ')
+            logger.info('Notification: TASK CREATED: ', { payload })
 
             const user = await userModel.findOne().where('_id').equals(payload.userId)
 
@@ -138,10 +145,10 @@ async function main() {
             else coercedError = new Error('Error sending notification email', { cause: error })
 
             reportExceptionIfActiveSpan(coercedError)
-            logger.error(
-              { error: coercedError, content: msg.content.toString() },
-              'Error sending notification email'
-            )
+            logger.error('Error sending notification email', {
+              error: makeErrorSerializable(coercedError),
+              content: msg.content.toString(),
+            })
           }
         }
       })
@@ -150,7 +157,7 @@ async function main() {
         if (msg) {
           try {
             const payload: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
-            logger.info({ payload }, 'Notification: TASK UPDATED: ')
+            logger.info('Notification: TASK UPDATED: ', { payload })
 
             const user = await userModel.findOne().where('_id').equals(payload.userId)
 
@@ -189,10 +196,10 @@ async function main() {
             else coercedError = new Error('Error sending notification email', { cause: error })
 
             reportExceptionIfActiveSpan(coercedError)
-            logger.error(
-              { error: coercedError, content: msg.content.toString() },
-              'Error sending notification email'
-            )
+            logger.error('Error sending notification email', {
+              error: makeErrorSerializable(coercedError),
+              content: msg.content.toString(),
+            })
           }
         }
       })
@@ -201,7 +208,7 @@ async function main() {
         if (msg) {
           try {
             const payload: AccountLinkedQueueMessage = JSON.parse(msg.content.toString())
-            logger.info({ payload }, 'Notification: ACCOUNT LINKED: ')
+            logger.info('Notification: ACCOUNT LINKED: ', { payload })
 
             const user = await userModel.findOne().where('_id').equals(payload.userId)
 
@@ -240,10 +247,10 @@ async function main() {
             else coercedError = new Error('Error sending notification email', { cause: error })
 
             reportExceptionIfActiveSpan(coercedError)
-            logger.error(
-              { error: coercedError, content: msg.content.toString() },
-              'Error sending notification email'
-            )
+            logger.error('Error sending notification email', {
+              error: makeErrorSerializable(coercedError),
+              content: msg.content.toString(),
+            })
           }
         }
       })
@@ -254,7 +261,7 @@ async function main() {
       if (error instanceof Error) coercedError = error
       else coercedError = new Error('Fatal exception during startup', { cause: error })
 
-      logger.fatal(coercedError, 'Fatal error during startup')
+      logger.fatal('Fatal error during startup', coercedError)
       startupSpan.recordException(coercedError)
       startupSpan.end()
       process.exit(1)

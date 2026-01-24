@@ -5,6 +5,7 @@ import { getServerConfig } from 'ms-task-app-common'
 import NextAuth, { type NextAuthConfig } from 'next-auth'
 
 import { OAuthServiceBaseUrl } from './lib/api-routing'
+import serverLogger from './lib/logging/server-logger'
 
 const serverEnv = getServerConfig()
 
@@ -18,5 +19,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth(
           certPath: serverEnv.webUi.certPath,
           caPath: serverEnv.webUi.caCertPath,
         },
+    logger: serverLogger,
   }) as NextAuthConfig
 )

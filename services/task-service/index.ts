@@ -8,7 +8,12 @@ import fs from 'fs'
 import https from 'https'
 import mongoose from 'mongoose'
 import { checkClientCert } from 'ms-task-app-auth'
-import { getServerConfig, redactedServerConfig, type JsonValue } from 'ms-task-app-common'
+import {
+  getServerConfig,
+  makeErrorSerializable,
+  redactedServerConfig,
+  type JsonValue,
+} from 'ms-task-app-common'
 import { TaskInputDtoSchema, type ApiErrorResponse, type TaskInputDto } from 'ms-task-app-dto'
 import { getTaskModel } from 'ms-task-app-entities'
 import {
@@ -40,7 +45,10 @@ const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond
   result,
   inputDto,
 }) => {
-  logger.warn({ validationErrors: result.validationErrors, inputDto }, result.message)
+  logger.warn(result.message, {
+    validationErrors: result.validationErrors,
+    inputDto: inputDto as JsonValue,
+  })
 }
 
 function handleErrors<
@@ -53,7 +61,7 @@ function handleErrors<
   {
     req,
     res,
-    defaultErrorMessage,
+    defaultErrorMessage = 'Unknown error',
     params,
   }: Pick<
     HandleUncaughtOptions<P, ResBody, ReqBody, ReqQuery, LocalsObj>,
@@ -66,9 +74,13 @@ function handleErrors<
       req,
       res,
       includeReason: true,
+      logger,
       beforeErrorRespond: (error, req) => {
         reportExceptionIfActiveSpan(error)
-        logger.error({ err: error, params: params || req.params }, defaultErrorMessage)
+        logger.error(defaultErrorMessage, {
+          err: makeErrorSerializable(error),
+          params: (params || req.params) as JsonValue,
+        })
       },
     },
     handler
@@ -88,7 +100,7 @@ async function main() {
       app.set('etag', false)
       app.use(
         pinoHttp({
-          logger,
+          logger: logger.pinoInstance,
           wrapSerializers: false,
           autoLogging: {
             ignore: req => req.url.includes('/ping'),
@@ -107,6 +119,7 @@ async function main() {
           host: serverEnv.rabbitmq.host,
           port: serverEnv.rabbitmq.port,
           tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
+          logger
         })
       )
 
@@ -135,6 +148,7 @@ async function main() {
                   tlsCAFile: serverEnv.taskSvc.caCertPath,
                   tlsCertificateKeyFile: serverEnv.taskSvc.keyCertComboPath,
                 },
+            logger,
           })
       )
 
@@ -254,6 +268,7 @@ async function main() {
             schema: TaskInputDtoSchema,
             validationErrorMsg: 'Create task input validation failed',
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors(
@@ -394,6 +409,7 @@ async function main() {
             schema: TaskInputDtoSchema,
             validationErrorMsg: 'Update task input validation failed',
             beforeErrorRespond: beforeValidationErrorRespond,
+            logger,
           }),
         async (req, res) =>
           handleErrors({ req, res, defaultErrorMessage: 'Error updating user task' }, async () => {
@@ -443,7 +459,6 @@ async function main() {
               )
             }
 
-            logger.info({ task }, 'Task updated successfully')
             res.status(204).send()
           })
       )
@@ -551,8 +566,8 @@ async function main() {
             if (error) {
               reportExceptionIfActiveSpan(error)
               logger.fatal(
-                error,
-                `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`
+                `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`,
+                error
               )
             } else {
               logger.info(`${serviceName} listening on unsecure port ${servicePort}`)
@@ -579,8 +594,8 @@ async function main() {
           .once('error', err => {
             if (!server.listening) {
               logger.fatal(
-                err,
-                `Fatal error during startup, while attempting to listen on port ${servicePort}.`
+                `Fatal error during startup, while attempting to listen on port ${servicePort}.`,
+                err
               )
               startupSpan.end()
             }
@@ -591,7 +606,7 @@ async function main() {
       if (error instanceof Error) coercedError = error
       else coercedError = new Error('Fatal exception during startup', { cause: error })
 
-      logger.fatal(coercedError, 'Fatal error during startup')
+      logger.fatal('Fatal error during startup', coercedError)
       startupSpan.recordException(coercedError)
       startupSpan.end()
       process.exit(1)

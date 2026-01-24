@@ -23,7 +23,8 @@
   "dependencies": {
     "@auth/core": "0.41.1",
     "ms-task-app-dto": "0.0.0",
-    "ms-task-app-mtls": "0.0.0"
+    "ms-task-app-mtls": "0.0.0",
+    "ms-task-app-telemetry": "0.0.0"
   },
   "devDependencies": {
     "@types/express-serve-static-core": "^5.0.0",

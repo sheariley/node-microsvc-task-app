@@ -1,7 +1,8 @@
 import otel from '@opentelemetry/api'
 import type { NextFunction, ParamsDictionary, Request, Response } from 'express-serve-static-core'
-import { coalesceErrorMsg, isErrorLike } from 'ms-task-app-common'
+import { coalesceError, coalesceErrorMsg, isErrorLike } from 'ms-task-app-common'
 import { mapDtoValidationErrors, type ApiValidationErrorResponse } from 'ms-task-app-dto'
+import { DefaultConsoleLogger, type ILogger } from 'ms-task-app-telemetry'
 import type { ParsedQs } from 'qs'
 import * as z from 'zod'
 
@@ -12,8 +13,8 @@ export type InputDtoValidatorOptions<
   LocalsObj extends Record<string, any> = Record<string, any>,
   ZSchema extends z.ZodType = z.ZodType,
 > = {
-  req: Request<P, ResBody | ApiValidationErrorResponse, z.infer<ZSchema>, ReqQuery, LocalsObj>,
-  res: Response<ResBody | ApiValidationErrorResponse, LocalsObj, number>,
+  req: Request<P, ResBody | ApiValidationErrorResponse, z.infer<ZSchema>, ReqQuery, LocalsObj>
+  res: Response<ResBody | ApiValidationErrorResponse, LocalsObj, number>
   next: NextFunction
   schema: ZSchema
   inputDto?: z.infer<ZSchema>
@@ -24,6 +25,7 @@ export type InputDtoValidatorOptions<
     result: ApiValidationErrorResponse
     inputDto: z.infer<ZSchema>
   }) => any
+  logger?: ILogger
 }
 
 export const DefaultValidationErrorMsg = 'Input validation failed'
@@ -45,6 +47,7 @@ export async function validInputDto<
   beforeErrorRespond,
   validationErrorMsg = DefaultValidationErrorMsg,
   validationErrorStatus = DefaultValidationErrorStatus,
+  logger = DefaultConsoleLogger,
 }: InputDtoValidatorOptions<P, ResBody, ReqQuery, LocalsObj, ZSchema>) {
   const tracer = otel.trace.getTracer('ms-task-app-service-util')
   const result = await tracer.startActiveSpan('input-dto-validation', async validationSpan => {
@@ -64,7 +67,7 @@ export async function validInputDto<
       if (valResult.success) {
         validationSpan.addEvent('validation-pass')
         validationSpan.end()
-        
+
         if (typeof onSucceed === 'function') {
           onSucceed(valResult.data)
         }
@@ -85,6 +88,7 @@ export async function validInputDto<
         res.status(validationErrorStatus).json(errorRes)
       }
     } catch (error) {
+      logger.error('Error while validating input DTO', coalesceError(error))
       if (validationSpan.isRecording()) {
         const message = coalesceErrorMsg(error, 'Error while validating input DTO')
         validationSpan.recordException(

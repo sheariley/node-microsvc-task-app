@@ -6,6 +6,7 @@ import { getServerConfig, getServiceBaseUrl } from 'ms-task-app-common'
 import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 
 import type { Locals } from './express-types.ts'
+import logger from './logger.ts'
 
 const serverEnv = getServerConfig()
 const authServiceUrl = getServiceBaseUrl({
@@ -22,6 +23,7 @@ const authConfig = getAuthConfig({
         certPath: serverEnv.taskSvc.certPath,
         caPath: serverEnv.taskSvc.caCertPath,
       },
+  logger,
 })
 
 export async function authenticatedUser(
