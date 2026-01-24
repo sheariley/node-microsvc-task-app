@@ -455,6 +455,7 @@ services:
     restart: unless-stopped
 
   init-volumes:
+    profiles: [full]
     image: busybox
     command: sh -c "chown -R 1001:1001 /run/logs"
     volumes:
