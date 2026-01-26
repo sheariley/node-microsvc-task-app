@@ -16,6 +16,7 @@ import {
   connectMongoDbWithRetry,
   connectMQWithRetry,
   disableResponseCaching,
+  startMtlsHttpServer,
   validInputDto,
   type InputDtoValidatorOptions,
   type TaskCreatedQueueMessage,
@@ -462,47 +463,20 @@ async function main() {
       app.use(ApiUncaughtHandler)
 
       // Start listening
-      if (serverEnv.disableInternalMtls) {
-        app.listen(servicePort, error => {
-          try {
-            if (error) {
-              reportExceptionIfActiveSpan(error)
-              logger.fatal(
-                `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`,
-                error
-              )
-            } else {
-              logger.info(`${serviceName} listening on unsecure port ${servicePort}`)
-            }
-          } catch {
-            // swallow
-          }
-          startupSpan.end()
-        })
-      } else {
-        const httpsServerOptions: https.ServerOptions = {
-          key: fs.readFileSync(serverEnv.taskSvc.privateKeyPath),
-          cert: fs.readFileSync(serverEnv.taskSvc.certPath),
-          ca: fs.readFileSync(serverEnv.taskSvc.caCertPath),
-          requestCert: true, // request client cert
-          rejectUnauthorized: true, // reject connections with invalid or missing client cert
-        }
-        const server = https
-          .createServer(httpsServerOptions, app)
-          .listen(servicePort, () => {
-            logger.info(`${serviceName} listening on secure port ${servicePort}`)
-            startupSpan.end()
-          })
-          .once('error', err => {
-            if (!server.listening) {
-              logger.fatal(
-                `Fatal error during startup, while attempting to listen on port ${servicePort}.`,
-                err
-              )
-              startupSpan.end()
-            }
-          })
-      }
+      await startMtlsHttpServer(app, {
+        disableMtls: serverEnv.disableInternalMtls,
+        port: serverEnv.taskSvc.port,
+        privateKeyPath: serverEnv.taskSvc.privateKeyPath,
+        certPath: serverEnv.taskSvc.certPath,
+        caCertPath: serverEnv.taskSvc.caCertPath,
+        requestCert: true,
+        rejectUnauthorized: true,
+      })
+
+      logger.info(
+        `${serviceName} listening on ${serverEnv.disableInternalMtls ? '' : 'secure '}port ${servicePort}`
+      )
+      startupSpan.end()
     } catch (error) {
       let coercedError: Error
       if (error instanceof Error) coercedError = error

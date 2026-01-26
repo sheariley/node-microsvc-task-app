@@ -4,10 +4,8 @@ import otel from '@opentelemetry/api'
 import {
   getServerConfig,
   makeErrorSerializable,
-  redactedServerConfig,
-  type TaskAppServerConfig,
+  redactedServerConfig
 } from 'ms-task-app-common'
-import { getUserModel } from 'ms-task-app-entities'
 import {
   connectMongoDbWithRetry,
   connectMQWithRetry,
@@ -15,25 +13,18 @@ import {
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
-import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
-import nodemailer from 'nodemailer'
+import { reportExceptionIfActiveSpan } from 'ms-task-app-telemetry'
 
 import logger from './lib/logger.ts'
+import { createMailer } from './lib/mailer.ts'
+import {
+  createAccountLinkedMessageHandler,
+  createTaskCreatedMessageHandler,
+  createTaskUpdatedMessageHandler,
+} from './msg-handlers/index.ts'
 
 // Server settings
 const serviceName = 'notification-service'
-
-function createMailTransport({ host, port, user, pass }: TaskAppServerConfig['smtp']) {
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: false,
-    auth: {
-      user,
-      pass,
-    },
-  })
-}
 
 async function main() {
   process.on('uncaughtException', err => {
@@ -47,6 +38,7 @@ async function main() {
     try {
       const serverEnv = getServerConfig()
       console.info('Sever Config', redactedServerConfig(serverEnv))
+
       const {
         mqConnection,
         mqChannel,
@@ -95,56 +87,35 @@ async function main() {
         process.exit(1)
       }
 
-      const userModel = getUserModel()
-
-      const mailTransport = await tracer.startActiveSpan(
+      logger.info('Creating mail transport...')
+      const mailer = await tracer.startActiveSpan(
         'mail-transport-init',
         async mailTransInitSpan => {
-          logger.info('Creating mail transport...')
-          const result = createMailTransport(serverEnv.smtp)
+          const result = createMailer({
+            ...serverEnv.smtp,
+            fromEmail: serverEnv.notifySvc.fromEmail,
+          })
           mailTransInitSpan.end()
           return result
         }
       )
 
+      const handleTaskCreatedMsg = createTaskCreatedMessageHandler(tracer, mailer)
+      const handleTaskUpdatedMsg = createTaskUpdatedMessageHandler(tracer, mailer)
+      const handleAccountLinkedMsg = createAccountLinkedMessageHandler(tracer, mailer)
+
       mqChannel.consume(serverEnv.rabbitmq.taskCreatedQueueName, async msg => {
         if (msg) {
           try {
             const payload: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
-            logger.info('Notification: TASK CREATED: ', { payload })
-
-            const user = await userModel.findOne().where('_id').equals(payload.userId)
-
-            if (!user) {
-              throw new Error(
-                `User with ID ${payload.userId} associated with task notification not found.`
-              )
-            }
-
-            if (!user.email) {
-              logger.warn(
-                `User with ID ${payload.userId} associated with task notification has no email address.`
-              )
-              mqChannel.nack(msg)
-              return
-            }
-
-            const mailResult = await startSelfClosingActiveSpan(tracer, 'nodemailer.sendMail', () =>
-              mailTransport.sendMail({
-                from: serverEnv.notifySvc.fromEmail,
-                to: user.email,
-                subject: 'A new task was created',
-                text: `A new task was created for you! The title was "${payload.title}".`,
-              })
-            )
-
-            if (mailResult.messageId) {
-              logger.info(
-                `Task creation email notification sent. TaskId: ${payload.taskId}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
-              )
-              mqChannel.ack(msg)
-            }
+            await handleTaskCreatedMsg(payload)
+            mqChannel.ack(msg)
           } catch (error) {
+            try {
+              mqChannel.nack(msg)
+            } catch {
+              // swallow
+            }
             let coercedError: Error
             if (error instanceof Error) coercedError = error
             else coercedError = new Error('Error sending notification email', { cause: error })
@@ -162,40 +133,14 @@ async function main() {
         if (msg) {
           try {
             const payload: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
-            logger.info('Notification: TASK UPDATED: ', { payload })
-
-            const user = await userModel.findOne().where('_id').equals(payload.userId)
-
-            if (!user) {
-              throw new Error(
-                `User with ID ${payload.userId} associated with task notification not found.`
-              )
-            }
-
-            if (!user.email) {
-              logger.warn(
-                `User with ID ${payload.userId} associated with task notification has no email address.`
-              )
-              mqChannel.nack(msg)
-              return
-            }
-
-            const mailResult = await startSelfClosingActiveSpan(tracer, 'nodemailer.sendMail', () =>
-              mailTransport.sendMail({
-                from: serverEnv.notifySvc.fromEmail,
-                to: user.email,
-                subject: 'A task was updated',
-                text: `The task titled "${payload.title}" was updated. Completed: ${payload.completed}`,
-              })
-            )
-
-            if (mailResult.messageId) {
-              logger.info(
-                `Task update email notification sent. TaskId: ${payload.taskId}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
-              )
-              mqChannel.ack(msg)
-            }
+            await handleTaskUpdatedMsg(payload)
+            mqChannel.ack(msg)
           } catch (error) {
+            try {
+              mqChannel.nack(msg)
+            } catch {
+              // swallow
+            }
             let coercedError: Error
             if (error instanceof Error) coercedError = error
             else coercedError = new Error('Error sending notification email', { cause: error })
@@ -213,40 +158,14 @@ async function main() {
         if (msg) {
           try {
             const payload: AccountLinkedQueueMessage = JSON.parse(msg.content.toString())
-            logger.info('Notification: ACCOUNT LINKED: ', { payload })
-
-            const user = await userModel.findOne().where('_id').equals(payload.userId)
-
-            if (!user) {
-              throw new Error(
-                `User with ID ${payload.userId} associated with account notification not found.`
-              )
-            }
-
-            if (!user.email) {
-              logger.warn(
-                `User with ID ${payload.userId} associated with account notification has no email address.`
-              )
-              mqChannel.nack(msg)
-              return
-            }
-
-            const mailResult = await startSelfClosingActiveSpan(tracer, 'nodemailer.sendMail', () =>
-              mailTransport.sendMail({
-                from: serverEnv.notifySvc.fromEmail,
-                to: user.email,
-                subject: 'An account of yours was linked',
-                text: `Your ${payload.provider} account was linked.`,
-              })
-            )
-
-            if (mailResult.messageId) {
-              logger.info(
-                `Account link email notification sent. Provider: ${payload.provider}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
-              )
-              mqChannel.ack(msg)
-            }
+            await handleAccountLinkedMsg(payload)
+            mqChannel.ack(msg)
           } catch (error) {
+            try {
+              mqChannel.nack(msg)
+            } catch {
+              // swallow
+            }
             let coercedError: Error
             if (error instanceof Error) coercedError = error
             else coercedError = new Error('Error sending notification email', { cause: error })

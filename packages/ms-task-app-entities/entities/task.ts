@@ -28,6 +28,17 @@ export const TaskDbSchema = new mongoose.Schema({
     completed: Boolean,
   })
 
-export function getTaskModel() {
+export function _getTaskModel() {
   return mongoose.model('Task', TaskDbSchema)
+}
+
+export type TaskModel = ReturnType<typeof _getTaskModel>
+
+let taskModel: TaskModel
+
+export function getTaskModel() {
+  if (!taskModel) {
+    taskModel = _getTaskModel()
+  }
+  return taskModel
 }

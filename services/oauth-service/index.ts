@@ -28,6 +28,7 @@ import {
   ApiUncaughtHandler,
   connectMQWithRetry,
   disableResponseCaching,
+  startMtlsHttpServer,
   validInputDto,
   type AccountLinkedQueueMessage,
   type InputDtoValidatorOptions,
@@ -83,7 +84,7 @@ async function main() {
     logger.fatal('Uncaught error during initialization', err)
     process.exit(1)
   })
-  
+
   // TODO: Pull service-version from package.json
   const tracer = otel.trace.getTracer(serviceName, '1.0.0')
   await tracer.startActiveSpan('service-startup', async startupSpan => {
@@ -541,47 +542,20 @@ async function main() {
       app.use(ApiUncaughtHandler)
 
       // Start listening
-      if (serverEnv.disableInternalMtls) {
-        app.listen(servicePort, error => {
-          try {
-            if (error) {
-              reportExceptionIfActiveSpan(error)
-              logger.fatal(
-                `Fatal error occurred while ${serviceName} attempted to listen on port ${servicePort}`,
-                error
-              )
-            } else {
-              logger.info(`${serviceName} listening on unsecure port ${servicePort}`)
-            }
-          } catch {
-            // swallow
-          }
-          startupSpan.end()
-        })
-      } else {
-        const httpsServerOptions: https.ServerOptions = {
-          key: fs.readFileSync(serverEnv.oauthSvc.privateKeyPath),
-          cert: fs.readFileSync(serverEnv.oauthSvc.certPath),
-          ca: fs.readFileSync(serverEnv.oauthSvc.caCertPath),
-          requestCert: true, // request client cert
-          rejectUnauthorized: true, // reject connections with invalid or missing client cert
-        }
-        const server = https
-          .createServer(httpsServerOptions, app)
-          .listen(servicePort, () => {
-            logger.info(`${serviceName} listening on secure port ${servicePort}`)
-            startupSpan.end()
-          })
-          .once('error', err => {
-            if (!server.listening) {
-              logger.fatal(
-                `Fatal error during startup, while attempting to listen on port ${servicePort}.`,
-                err
-              )
-              startupSpan.end()
-            }
-          })
-      }
+      await startMtlsHttpServer(app, {
+        disableMtls: serverEnv.disableInternalMtls,
+        port: serverEnv.oauthSvc.port,
+        privateKeyPath: serverEnv.oauthSvc.privateKeyPath,
+        certPath: serverEnv.oauthSvc.certPath,
+        caCertPath: serverEnv.oauthSvc.caCertPath,
+        requestCert: true,
+        rejectUnauthorized: true,
+      })
+
+      logger.info(
+        `${serviceName} listening on ${serverEnv.disableInternalMtls ? '' : 'secure '}port ${servicePort}`
+      )
+      startupSpan.end()
     } catch (error) {
       let coercedError: Error
       if (error instanceof Error) coercedError = error

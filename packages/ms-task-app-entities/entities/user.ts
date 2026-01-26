@@ -22,6 +22,19 @@ export const UserDbSchema = new mongoose.Schema({
   },
 })
 
-export function getUserModel() {
+export function _getUserModel() {
   return mongoose.model('User', UserDbSchema)
 }
+
+export type UserModel = ReturnType<typeof _getUserModel>
+
+let userModel: UserModel
+
+export function getUserModel(): UserModel {
+  if (!userModel) {
+    userModel = _getUserModel()
+  }
+  return userModel
+}
+
+
