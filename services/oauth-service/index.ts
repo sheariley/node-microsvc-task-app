@@ -79,6 +79,11 @@ const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond
 }
 
 async function main() {
+  process.on('uncaughtException', err => {
+    logger.fatal('Uncaught error during initialization', err)
+    process.exit(1)
+  })
+  
   // TODO: Pull service-version from package.json
   const tracer = otel.trace.getTracer(serviceName, '1.0.0')
   await tracer.startActiveSpan('service-startup', async startupSpan => {
