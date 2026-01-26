@@ -5,6 +5,7 @@ import { TaskList } from '@/app/components/task-list/task-list.client'
 import { Alert, Button, Link } from '@/app/components/ui'
 import { getSSRTaskServiceClient } from '@/lib/api-clients/ssr'
 import serverLogger from '@/lib/logging/server-logger'
+import { coalesceError } from 'ms-task-app-common'
 
 type TaskListViewProps = {
   userId: string
@@ -29,7 +30,7 @@ export async function TaskListView({ userId }: TaskListViewProps) {
 
     return <TaskList userId={userId} tasks={tasks} />
   } catch (error) {
-    serverLogger.error(error, 'Failed to fetch tasks')
+    serverLogger.error('Failed to fetch tasks', coalesceError(error))
     return (
       <Alert
         color="danger"

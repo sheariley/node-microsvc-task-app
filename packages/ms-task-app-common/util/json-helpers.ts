@@ -7,7 +7,7 @@ export function isJsonPrimitive(obj: unknown): obj is JsonPrimitive {
 }
 
 export function isJsonArray(obj: unknown): obj is JsonArray {
-  return Array.isArray(obj) && obj.every(isJsonValue)
+  return Array.isArray(obj) && (!obj.length || obj.every(isJsonValue))
 }
 
 export function isJsonObject(obj: unknown): obj is JsonObject {
@@ -15,10 +15,14 @@ export function isJsonObject(obj: unknown): obj is JsonObject {
     obj !== null &&
     typeof obj === 'object' &&
     !Array.isArray(obj) &&
-    Object.values(obj).every(isJsonValue)
+    (!Object.values(obj).length || Object.values(obj).every(isJsonValueOrUndefined))
   )
 }
 
 export function isJsonValue(obj: unknown): obj is JsonValue {
   return isJsonPrimitive(obj) || isJsonArray(obj) || isJsonObject(obj)
+}
+
+export function isJsonValueOrUndefined(obj: unknown) {
+  return isJsonValue(obj) || typeof obj === 'undefined'
 }

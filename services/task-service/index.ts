@@ -3,33 +3,26 @@ import './instrumentation.ts'
 import otel from '@opentelemetry/api'
 import bodyParser from 'body-parser'
 import express, { type RequestHandler } from 'express'
-import type { ParamsDictionary, Query, Response } from 'express-serve-static-core'
+import type { Query, Response } from 'express-serve-static-core'
 import fs from 'fs'
 import https from 'https'
 import mongoose from 'mongoose'
 import { checkClientCert } from 'ms-task-app-auth'
-import {
-  getServerConfig,
-  makeErrorSerializable,
-  redactedServerConfig,
-  type JsonValue,
-} from 'ms-task-app-common'
+import { getServerConfig, redactedServerConfig, type JsonValue } from 'ms-task-app-common'
 import { TaskInputDtoSchema, type ApiErrorResponse, type TaskInputDto } from 'ms-task-app-dto'
 import { getTaskModel } from 'ms-task-app-entities'
 import {
+  ApiUncaughtHandler,
   connectMongoDbWithRetry,
   connectMQWithRetry,
   disableResponseCaching,
-  handleUncaught,
   validInputDto,
-  type HandleUncaughtOptions,
   type InputDtoValidatorOptions,
   type TaskCreatedQueueMessage,
   type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
 import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import { pinoHttp } from 'pino-http'
-import type { ParsedQs } from 'qs'
 
 import { authenticatedUser } from './lib/authenticated-user.ts'
 import type { BulkOpLocals, Locals } from './lib/express-types.ts'
@@ -51,43 +44,12 @@ const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond
   })
 }
 
-function handleErrors<
-  P = ParamsDictionary,
-  ResBody = any,
-  ReqBody = any,
-  ReqQuery = ParsedQs,
-  LocalsObj extends Record<string, any> = Record<string, any>,
->(
-  {
-    req,
-    res,
-    defaultErrorMessage = 'Unknown error',
-    params,
-  }: Pick<
-    HandleUncaughtOptions<P, ResBody, ReqBody, ReqQuery, LocalsObj>,
-    'req' | 'res' | 'defaultErrorMessage'
-  > & { params?: Record<string, JsonValue> },
-  handler: Function
-) {
-  return handleUncaught(
-    {
-      req,
-      res,
-      includeReason: true,
-      logger,
-      beforeErrorRespond: (error, req) => {
-        reportExceptionIfActiveSpan(error)
-        logger.error(defaultErrorMessage, {
-          err: makeErrorSerializable(error),
-          params: (params || req.params) as JsonValue,
-        })
-      },
-    },
-    handler
-  )
-}
-
 async function main() {
+  process.on('uncaughtException', err => {
+    logger.fatal('Uncaught error during initialization', err)
+    process.exit(1)
+  })
+
   // TODO: Pull service-version from package.json
   const tracer = otel.trace.getTracer(serviceName, '1.0.0')
   await tracer.startActiveSpan('service-startup', async startupSpan => {
@@ -107,6 +69,8 @@ async function main() {
           },
         })
       )
+      app.set('logger', logger)
+      app.set('tracer', tracer)
       app.use(bodyParser.json())
       app.use(disableResponseCaching)
 
@@ -119,7 +83,7 @@ async function main() {
           host: serverEnv.rabbitmq.host,
           port: serverEnv.rabbitmq.port,
           tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
-          logger
+          logger,
         })
       )
 
@@ -195,71 +159,58 @@ async function main() {
       })
 
       // Get User's Tasks
-      app.get(
-        '/users/:userId/tasks',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
-        async (req, res) =>
-          handleErrors({ req, res, defaultErrorMessage: 'Error fetching user tasks' }, async () => {
-            const { userId } = req.params
-            const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
-              mongoose.isValidObjectId(userId)
-            )
+      app.get('/users/:userId/tasks', authenticatedUser, async (req, res) => {
+        const { userId } = req.params
+        const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
+          mongoose.isValidObjectId(userId)
+        )
 
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).json({ error: true, message: 'Not Found' })
-            }
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).json({ error: true, message: 'Not Found' })
+        }
 
-            if (req.params.userId !== res.locals.user?.id) {
-              return res.status(403).json({ error: true, message: 'Unauthorized' })
-            }
+        if (req.params.userId !== res.locals.user?.id) {
+          return res.status(403).json({ error: true, message: 'Unauthorized' })
+        }
 
-            const tasks = await taskModel.find().where('userId').equals(userId)
-            res.status(200).json(tasks)
-          })
-      )
+        const tasks = await taskModel.find().where('userId').equals(userId)
+        res.status(200).json(tasks)
+      })
 
       // Get a specific user's task by ID
-      app.get(
-        '/users/:userId/tasks/:taskId',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
-        async (req, res) =>
-          handleErrors(
-            { req, res, defaultErrorMessage: 'Error while fetching user task' },
-            async () => {
-              const { userId, taskId } = req.params
-              const routeParamValResult = startSelfClosingActiveSpan(
-                tracer,
-                'param-validation',
-                () => mongoose.isValidObjectId(userId) && mongoose.isValidObjectId(taskId)
-              )
+      app.get('/users/:userId/tasks/:taskId', authenticatedUser, async (req, res) => {
+        const { userId, taskId } = req.params
+        const routeParamValResult = startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          () => mongoose.isValidObjectId(userId) && mongoose.isValidObjectId(taskId)
+        )
 
-              // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-              if (!routeParamValResult) {
-                return res.status(404).send()
-              }
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
 
-              if (req.params.userId !== res.locals.user?.id) {
-                return res.status(403).json({ error: true, message: 'Unauthorized' })
-              }
+        if (req.params.userId !== res.locals.user?.id) {
+          return res.status(403).json({ error: true, message: 'Unauthorized' })
+        }
 
-              const task = await taskModel
-                .findById(req.params.taskId)
-                .where('userId')
-                .equals(req.params.userId)
-              if (!task) {
-                return res.status(404).json({ error: true, message: 'Task not found' })
-              } else {
-                res.json(task)
-              }
-            }
-          )
-      )
+        const task = await taskModel
+          .findById(req.params.taskId)
+          .where('userId')
+          .equals(req.params.userId)
+        if (!task) {
+          return res.status(404).json({ error: true, message: 'Task not found' })
+        } else {
+          res.json(task)
+        }
+      })
 
       // Create a task for a user
       app.post(
         '/users/:userId/tasks',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
+        authenticatedUser,
         async (req, res, next) =>
           validInputDto({
             req,
@@ -270,58 +221,50 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors(
-            { req, res, defaultErrorMessage: 'Error creating a user task' },
-            async () => {
-              const { userId } = req.params
+        async (req, res) => {
+          const { userId } = req.params
 
-              const routeParamValResult = startSelfClosingActiveSpan(
-                tracer,
-                'param-validation',
-                () => mongoose.isValidObjectId(userId)
-              )
-
-              // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-              if (!routeParamValResult) {
-                return res.status(404).send()
-              }
-
-              if (req.params.userId !== res.locals.user?.id) {
-                return res.status(403).json({ error: true, message: 'Unauthorized' })
-              }
-
-              const { title, description, completed } = req.body as TaskInputDto
-
-              const task = new taskModel({
-                userId,
-                title,
-                description,
-                completed,
-                createdAt: new Date(),
-              })
-              await task.save()
-
-              // TODO: Add fault tolerance logic here
-              if (!mqChannel) {
-                return res
-                  .status(503)
-                  .json({ error: true, message: 'RabbitMQ channel not connected' })
-              } else {
-                const taskCreatedMsg: TaskCreatedQueueMessage = {
-                  taskId: task._id.toString(),
-                  userId: userId!,
-                  title,
-                }
-                mqChannel.sendToQueue(
-                  serverEnv.rabbitmq.taskCreatedQueueName,
-                  Buffer.from(JSON.stringify(taskCreatedMsg))
-                )
-              }
-
-              res.status(201).json(task)
-            }
+          const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
+            mongoose.isValidObjectId(userId)
           )
+
+          // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+          if (!routeParamValResult) {
+            return res.status(404).send()
+          }
+
+          if (req.params.userId !== res.locals.user?.id) {
+            return res.status(403).json({ error: true, message: 'Unauthorized' })
+          }
+
+          const { title, description, completed } = req.body as TaskInputDto
+
+          const task = new taskModel({
+            userId,
+            title,
+            description,
+            completed,
+            createdAt: new Date(),
+          })
+          await task.save()
+
+          // TODO: Add fault tolerance logic here
+          if (!mqChannel) {
+            return res.status(503).json({ error: true, message: 'RabbitMQ channel not connected' })
+          } else {
+            const taskCreatedMsg: TaskCreatedQueueMessage = {
+              taskId: task._id.toString(),
+              userId: userId!,
+              title,
+            }
+            mqChannel.sendToQueue(
+              serverEnv.rabbitmq.taskCreatedQueueName,
+              Buffer.from(JSON.stringify(taskCreatedMsg))
+            )
+          }
+
+          res.status(201).json(task)
+        }
       )
 
       const bulkUpdateCompleted = (
@@ -333,74 +276,60 @@ async function main() {
         Query,
         Locals & BulkOpLocals
       > => {
-        return async (req, res) =>
-          handleErrors(
+        return async (req, res) => {
+          const { userId } = req.params
+
+          const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
+            mongoose.isValidObjectId(userId)
+          )
+
+          // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+          if (!routeParamValResult) {
+            return res.status(404).send()
+          }
+
+          if (req.params.userId !== res.locals.user?.id) {
+            return res.status(403).json({ error: true, message: 'Unauthorized' })
+          }
+
+          const { matchedCount, modifiedCount } = await taskModel.updateMany(
             {
-              req,
-              res,
-              defaultErrorMessage: 'Error while bulk updating completion of user task(s)',
-              params: {
-                ...req.params,
-                taskIds: res.locals.taskIds,
-              },
+              userId,
+              _id: res.locals.taskIds,
             },
-            async () => {
-              const { userId } = req.params
-
-              const routeParamValResult = startSelfClosingActiveSpan(
-                tracer,
-                'param-validation',
-                () => mongoose.isValidObjectId(userId)
-              )
-
-              // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-              if (!routeParamValResult) {
-                return res.status(404).send()
-              }
-
-              if (req.params.userId !== res.locals.user?.id) {
-                return res.status(403).json({ error: true, message: 'Unauthorized' })
-              }
-
-              const { matchedCount, modifiedCount } = await taskModel.updateMany(
-                {
-                  userId,
-                  _id: res.locals.taskIds,
-                },
-                {
-                  $set: { completed },
-                }
-              )
-
-              if (!matchedCount) {
-                return res.status(404).json({ error: true, message: 'Task(s) not found' })
-              }
-
-              res.status(200).json({ matchedCount, modifiedCount })
+            {
+              $set: { completed },
             }
           )
+
+          if (!matchedCount) {
+            return res.status(404).json({ error: true, message: 'Task(s) not found' })
+          }
+
+          res.status(200).json({ matchedCount, modifiedCount })
+        }
       }
 
       // Mark multiple tasks complete for a user
       app.put(
         '/users/:userId/tasks/complete',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
-        async (req, res, next) => validBulkOpParams(tracer, req, res, next),
+        authenticatedUser,
+        validBulkOpParams,
         bulkUpdateCompleted(true)
       )
 
       // Mark multiple tasks incomplete for a user
       app.put(
         '/users/:userId/tasks/uncomplete',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
-        async (req, res, next) => validBulkOpParams(tracer, req, res, next),
+        authenticatedUser,
+        validBulkOpParams,
         bulkUpdateCompleted(false)
       )
 
       // Update a task for a user
       app.put(
         '/users/:userId/tasks/:taskId',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
+        authenticatedUser,
         async (req, res, next) =>
           validInputDto({
             req,
@@ -411,153 +340,126 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors({ req, res, defaultErrorMessage: 'Error updating user task' }, async () => {
-            const { taskId, userId } = req.params
+        async (req, res) => {
+          const { taskId, userId } = req.params
 
-            const routeParamValResult = startSelfClosingActiveSpan(
-              tracer,
-              'param-validation',
-              () => mongoose.isValidObjectId(userId) && mongoose.isValidObjectId(taskId)
+          const routeParamValResult = startSelfClosingActiveSpan(
+            tracer,
+            'param-validation',
+            () => mongoose.isValidObjectId(userId) && mongoose.isValidObjectId(taskId)
+          )
+
+          // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+          if (!routeParamValResult) {
+            return res.status(404).send()
+          }
+
+          if (req.params.userId !== res.locals.user?.id) {
+            return res.status(403).json({ error: true, message: 'Unauthorized' })
+          }
+
+          const { title, description, completed } = req.body as Partial<TaskInputDto>
+          const task = await taskModel
+            .findByIdAndUpdate(taskId, { title, description, completed }, { new: true })
+            .where('userId')
+            .equals(userId)
+
+          if (!task) {
+            return res.status(404).json({ error: true, message: 'Task not found' })
+          }
+
+          // TODO: Add fault tolerance logic here
+          if (!mqChannel) {
+            return res.status(503).json({ error: true, message: 'RabbitMQ channel not connected' })
+          } else {
+            const taskUpdatedMsg: TaskUpdatedQueueMessage = {
+              taskId: task._id.toString(),
+              userId: userId!,
+              title: task.title,
+              description: task.description,
+              completed: task.completed,
+            }
+            mqChannel.sendToQueue(
+              serverEnv.rabbitmq.taskUpdatedQueueName,
+              Buffer.from(JSON.stringify(taskUpdatedMsg))
             )
+          }
 
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).send()
-            }
-
-            if (req.params.userId !== res.locals.user?.id) {
-              return res.status(403).json({ error: true, message: 'Unauthorized' })
-            }
-
-            const { title, description, completed } = req.body as Partial<TaskInputDto>
-            const task = await taskModel
-              .findByIdAndUpdate(taskId, { title, description, completed }, { new: true })
-              .where('userId')
-              .equals(userId)
-
-            if (!task) {
-              return res.status(404).json({ error: true, message: 'Task not found' })
-            }
-
-            // TODO: Add fault tolerance logic here
-            if (!mqChannel) {
-              return res
-                .status(503)
-                .json({ error: true, message: 'RabbitMQ channel not connected' })
-            } else {
-              const taskUpdatedMsg: TaskUpdatedQueueMessage = {
-                taskId: task._id.toString(),
-                userId: userId!,
-                title: task.title,
-                description: task.description,
-                completed: task.completed,
-              }
-              mqChannel.sendToQueue(
-                serverEnv.rabbitmq.taskUpdatedQueueName,
-                Buffer.from(JSON.stringify(taskUpdatedMsg))
-              )
-            }
-
-            res.status(204).send()
-          })
+          res.status(204).send()
+        }
       )
 
       // Delete a user's task
-      app.delete(
-        '/users/:userId/tasks/:taskId',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
-        async (req, res) =>
-          handleErrors(
-            { req, res, defaultErrorMessage: 'Error while deleting user task' },
-            async () => {
-              const { taskId, userId } = req.params
+      app.delete('/users/:userId/tasks/:taskId', authenticatedUser, async (req, res) => {
+        const { taskId, userId } = req.params
 
-              const routeParamValResult = startSelfClosingActiveSpan(
-                tracer,
-                'param-validation',
-                () => mongoose.isValidObjectId(userId) && mongoose.isValidObjectId(taskId)
-              )
+        const routeParamValResult = startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          () => mongoose.isValidObjectId(userId) && mongoose.isValidObjectId(taskId)
+        )
 
-              // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-              if (!routeParamValResult) {
-                return res.status(404).send()
-              }
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
 
-              if (req.params.userId !== res.locals.user?.id) {
-                return res.status(403).json({ error: true, message: 'Unauthorized' })
-              }
+        if (req.params.userId !== res.locals.user?.id) {
+          return res.status(403).json({ error: true, message: 'Unauthorized' })
+        }
 
-              const task = await taskModel.findByIdAndDelete(taskId).where('userId').equals(userId)
+        const task = await taskModel.findByIdAndDelete(taskId).where('userId').equals(userId)
 
-              if (!task) {
-                return res.status(404).json({ error: true, message: 'Task not found' })
-              }
+        if (!task) {
+          return res.status(404).json({ error: true, message: 'Task not found' })
+        }
 
-              res.status(204).send()
-            }
-          )
-      )
+        res.status(204).send()
+      })
 
       // Delete multiple tasks for a user
       app.delete(
         '/users/:userId/tasks',
-        async (req, res, next) => authenticatedUser(tracer, req, res, next),
-        async (
-          req,
-          res: Response<ApiErrorResponse | { deletedCount: number }, Locals & BulkOpLocals>,
-          next
-        ) => validBulkOpParams(tracer, req, res, next),
+        authenticatedUser,
+        validBulkOpParams,
         async (
           req,
           res: Response<ApiErrorResponse | { deletedCount: number }, Locals & BulkOpLocals>
-        ) =>
-          handleErrors(
-            {
-              req,
-              res,
-              defaultErrorMessage: 'Error while deleting user tasks',
-              params: {
-                ...req.params,
-                taskIds: res.locals.taskIds,
-              },
-            },
-            async () => {
-              const { userId } = req.params
+        ) => {
+          const { userId } = req.params
 
-              const routeParamValResult = startSelfClosingActiveSpan(
-                tracer,
-                'param-validation',
-                () => mongoose.isValidObjectId(userId)
-              )
-
-              // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-              if (!routeParamValResult) {
-                return res.status(404).send()
-              }
-
-              if (req.params.userId !== res.locals.user?.id) {
-                return res.status(403).json({ error: true, message: 'Unauthorized' })
-              }
-
-              const deleteResult = await taskModel.deleteMany({
-                userId,
-                _id: res.locals.taskIds,
-              })
-
-              if (!deleteResult.deletedCount) {
-                return res.status(404).json({ error: true, message: 'Task(s) not found' })
-              }
-
-              res.status(200).json({ deletedCount: deleteResult.deletedCount })
-            }
+          const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
+            mongoose.isValidObjectId(userId)
           )
+
+          // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+          if (!routeParamValResult) {
+            return res.status(404).send()
+          }
+
+          if (req.params.userId !== res.locals.user?.id) {
+            return res.status(403).json({ error: true, message: 'Unauthorized' })
+          }
+
+          const deleteResult = await taskModel.deleteMany({
+            userId,
+            _id: res.locals.taskIds,
+          })
+
+          if (!deleteResult.deletedCount) {
+            return res.status(404).json({ error: true, message: 'Task(s) not found' })
+          }
+
+          res.status(200).json({ deletedCount: deleteResult.deletedCount })
+        }
       )
 
       // Not found
       app.use((req, res) => {
         res.status(404).json({ error: true, message: 'Not found' })
       })
+
+      app.use(ApiUncaughtHandler)
 
       // Start listening
       if (serverEnv.disableInternalMtls) {

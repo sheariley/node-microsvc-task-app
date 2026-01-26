@@ -1,4 +1,4 @@
-import { coalesceErrorMsg } from 'ms-task-app-common'
+import { coalesceError, coalesceErrorMsg } from 'ms-task-app-common'
 import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
 import { redirect } from 'next/navigation'
 
@@ -32,7 +32,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
       const taskApiClient = await getSSRTaskServiceClient()
       task = await taskApiClient.getUserTaskById(session.user.id!, taskId)
     } catch (err) {
-      serverLogger.error(err, 'Failed to fetch task')
+      serverLogger.error('Failed to fetch task', coalesceError(err))
       fetchError = coalesceErrorMsg(err)
     }
   }

@@ -2,10 +2,10 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import {
-  coalesceErrorMsg,
+  coalesceError,
   getServerConfig,
   HttpError,
-  httpResponseHasBody,
+  httpResponseHasBody
 } from 'ms-task-app-common'
 import { createMtlsFetcher } from 'ms-task-app-mtls'
 import { headers } from 'next/headers'
@@ -17,8 +17,8 @@ import {
   excludeHopByHopHeaders,
   setXForwardedHeaders,
 } from '@/lib/api-routing'
-import { serviceRoutes } from './service-routes'
 import serverLogger from '@/lib/logging/server-logger'
+import { serviceRoutes } from './service-routes'
 
 let _fetch: (url: string, requestInit: RequestInit) => Promise<Response> = fetch
 
@@ -49,12 +49,13 @@ const proxyRequest = auth(async req => {
   let targetBase: string
   try {
     const resolved = await gatewaySvcResolver.resolve(forwardPath || '/', req)
-    serverLogger.info({ from: forwardPath || '/', to: resolved.target }, 'API gateway route matched')
+    serverLogger.info('API gateway route matched', { from: forwardPath || '/', to: resolved.target })
     targetBase = resolved.target
   } catch (err) {
-    const message = coalesceErrorMsg(err, 'Internal gateway routing error')
+    const coalescedError = coalesceError(err, 'Internal gateway routing error')
+    serverLogger.error('Internal gateway routing error', coalescedError)
     const status = err instanceof HttpError ? err.status : 500
-    return NextResponse.json({ error: true, message }, { status })
+    return NextResponse.json({ error: true, message: coalescedError.message }, { status })
   }
 
   const targetUri = `${targetBase}${urlObj.search}`
@@ -96,9 +97,10 @@ const proxyRequest = auth(async req => {
       headers: respHeaders,
     })
   } catch (err) {
-    const message = coalesceErrorMsg(err, 'Internal Server Error')
+    const coalescedError = coalesceError(err, 'Internal server error')
+    serverLogger.error('Internal API gateway error', coalescedError)
     const status = err instanceof HttpError ? err.status : 500
-    return NextResponse.json({ error: true, message }, { status })
+    return NextResponse.json({ error: true, message: coalescedError.message }, { status })
   }
 })
 

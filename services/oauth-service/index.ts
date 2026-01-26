@@ -4,7 +4,6 @@ import { MongoDBAdapter } from '@auth/mongodb-adapter'
 import otel from '@opentelemetry/api'
 import bodyParser from 'body-parser'
 import express from 'express'
-import type { ParamsDictionary } from 'express-serve-static-core'
 import fs from 'fs'
 import https from 'https'
 import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
@@ -26,17 +25,15 @@ import {
   type AccountInputDto,
 } from 'ms-task-app-dto'
 import {
+  ApiUncaughtHandler,
   connectMQWithRetry,
   disableResponseCaching,
-  handleUncaught,
   validInputDto,
   type AccountLinkedQueueMessage,
-  type HandleUncaughtOptions,
   type InputDtoValidatorOptions,
 } from 'ms-task-app-service-util'
 import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import { pinoHttp } from 'pino-http'
-import type { ParsedQs } from 'qs'
 import * as z from 'zod'
 
 import logger from './lib/logger.ts'
@@ -81,41 +78,6 @@ const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond
   })
 }
 
-function handleErrors<
-  P = ParamsDictionary,
-  ResBody = any,
-  ReqBody = any,
-  ReqQuery = ParsedQs,
-  LocalsObj extends Record<string, any> = Record<string, any>,
->(
-  {
-    req,
-    res,
-    defaultErrorMessage = 'Unknown error',
-  }: Pick<
-    HandleUncaughtOptions<P, ResBody, ReqBody, ReqQuery, LocalsObj>,
-    'req' | 'res' | 'defaultErrorMessage'
-  >,
-  handler: Function
-) {
-  return handleUncaught(
-    {
-      req,
-      res,
-      includeReason: true,
-      logger,
-      beforeErrorRespond: (error, req) => {
-        reportExceptionIfActiveSpan(error)
-        logger.error(defaultErrorMessage, {
-          error: makeErrorSerializable(error),
-          params: req.params as JsonValue,
-        })
-      },
-    },
-    handler
-  )
-}
-
 async function main() {
   // TODO: Pull service-version from package.json
   const tracer = otel.trace.getTracer(serviceName, '1.0.0')
@@ -136,6 +98,7 @@ async function main() {
           },
         })
       )
+      app.set('logger', logger)
       app.use(bodyParser.json())
       app.use(disableResponseCaching)
 
@@ -213,84 +176,78 @@ async function main() {
         res.status(200).json({ timestamp: Date.now() })
       })
 
-      app.get('/users/by-email/:email', async (req, res) =>
-        handleErrors({ req, res, defaultErrorMessage: 'Error getting user by email' }, async () => {
-          const inputValResult = await startSelfClosingActiveSpan(
-            tracer,
-            'param-validation',
-            async () => z.email().safeParse(req.params.email)
-          )
-
-          // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-          if (!inputValResult.success) {
-            return res.status(404)
-          }
-
-          const result = await mongoAuthAdapter.getUserByEmail!(req.params.email)
-
-          if (!result) {
-            res
-              .status(404)
-              .json({ error: true, message: `User with email "${req.params.email}" not found` })
-          } else {
-            res.json(result)
-          }
-        })
-      )
-
-      app.get('/users/:userId', async (req, res) =>
-        handleErrors({ req, res, defaultErrorMessage: 'Error getting user by ID' }, async () => {
-          const { userId } = req.params
-
-          const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
-            mongoose.isValidObjectId(userId)
-          )
-
-          // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-          if (!routeParamValResult) {
-            return res.status(404).send()
-          }
-
-          const result = await mongoAuthAdapter.getUser!(userId)
-
-          if (!result) {
-            res.status(404).json({ error: true, message: `User with Id "${userId}" not found` })
-          } else {
-            res.status(200).json(result)
-          }
-        })
-      )
-
-      app.get('/providers/:provider/accounts/:providerAccountId/user', async (req, res) =>
-        handleErrors(
-          { req, res, defaultErrorMessage: 'Error fetching user by provider account' },
-          async () => {
-            const { provider, providerAccountId } = req.params
-
-            const routeParamValResult = startSelfClosingActiveSpan(
-              tracer,
-              'param-validation',
-              () => !!(provider && providerAccountId)
-            )
-
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).send()
-            }
-
-            const result = await mongoAuthAdapter.getUserByAccount!({ provider, providerAccountId })
-
-            if (!result) {
-              res.status(404).json({
-                error: true,
-                message: `User with provider account "${provider}, ${providerAccountId}" not found`,
-              })
-            } else {
-              res.status(200).json(result)
-            }
-          }
+      app.get('/users/by-email/:email', async (req, res) => {
+        const inputValResult = await startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          async () => z.email().safeParse(req.params.email)
         )
-      )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!inputValResult.success) {
+          return res.status(404)
+        }
+
+        const result = await mongoAuthAdapter.getUserByEmail!(req.params.email)
+
+        if (!result) {
+          res
+            .status(404)
+            .json({ error: true, message: `User with email "${req.params.email}" not found` })
+        } else {
+          res.json(result)
+        }
+      })
+
+      app.get('/users/:userId', async (req, res) => {
+        const { userId } = req.params
+
+        const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
+          mongoose.isValidObjectId(userId)
+        )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
+
+        const result = await mongoAuthAdapter.getUser!(userId)
+
+        if (!result) {
+          res.status(404).json({ error: true, message: `User with Id "${userId}" not found` })
+        } else {
+          res.status(200).json(result)
+        }
+      })
+
+      app.get('/providers/:provider/accounts/:providerAccountId/user', async (req, res) => {
+        const { provider, providerAccountId } = req.params
+
+        const routeParamValResult = startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          () => !!(provider && providerAccountId)
+        )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
+
+        const result = await mongoAuthAdapter.getUserByAccount!({
+          provider,
+          providerAccountId,
+        })
+
+        if (!result) {
+          res.status(404).json({
+            error: true,
+            message: `User with provider account "${provider}, ${providerAccountId}" not found`,
+          })
+        } else {
+          res.status(200).json(result)
+        }
+      })
 
       app.post(
         '/users',
@@ -304,11 +261,10 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors({ req, res, defaultErrorMessage: 'Error creating user' }, async () => {
-            const result = await mongoAuthAdapter.createUser!(req.body)
-            res.status(201).json(result)
-          })
+        async (req, res) => {
+          const result = await mongoAuthAdapter.createUser!(req.body)
+          res.status(201).json(result)
+        }
       )
 
       app.put(
@@ -323,27 +279,9 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors({ req, res, defaultErrorMessage: 'Error updating user' }, async () => {
-            const { userId } = req.params
-
-            const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
-              mongoose.isValidObjectId(userId)
-            )
-
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).send()
-            }
-
-            const result = await mongoAuthAdapter.updateUser!(req.body)
-            res.status(200).json(result)
-          })
-      )
-
-      app.delete('/users/:userId', async (req, res) =>
-        handleErrors({ req, res, defaultErrorMessage: 'Error deleting user' }, async () => {
+        async (req, res) => {
           const { userId } = req.params
+
           const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
             mongoose.isValidObjectId(userId)
           )
@@ -353,17 +291,32 @@ async function main() {
             return res.status(404).send()
           }
 
-          const result = await mongoAuthAdapter.deleteUser!(userId)
-
-          if (!result) {
-            res
-              .status(404)
-              .json({ error: true, message: `User with Id "${req.params.userId}" not found` })
-          } else {
-            res.status(200).json(result)
-          }
-        })
+          const result = await mongoAuthAdapter.updateUser!(req.body)
+          res.status(200).json(result)
+        }
       )
+
+      app.delete('/users/:userId', async (req, res) => {
+        const { userId } = req.params
+        const routeParamValResult = startSelfClosingActiveSpan(tracer, 'param-validation', () =>
+          mongoose.isValidObjectId(userId)
+        )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
+
+        const result = await mongoAuthAdapter.deleteUser!(userId)
+
+        if (!result) {
+          res
+            .status(404)
+            .json({ error: true, message: `User with Id "${req.params.userId}" not found` })
+        } else {
+          res.status(200).json(result)
+        }
+      })
 
       app.post(
         '/providers/:provider/accounts/link',
@@ -381,98 +334,84 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors(
-            { req, res, defaultErrorMessage: 'Error linking account provider' },
-            async () => {
-              const inputDto = {
-                ...req.body,
-                provider: req.params.provider,
-              } as AccountInputDto
+        async (req, res) => {
+          const inputDto = {
+            ...req.body,
+            provider: req.params.provider,
+          } as AccountInputDto
 
-              const result = await mongoAuthAdapter.linkAccount!(inputDto)
-              res.status(201).json(result)
+          const result = await mongoAuthAdapter.linkAccount!(inputDto)
+          res.status(201).json(result)
 
-              // TODO: Add fault tolerance and fallback logic (send direct to notification service)
-              const accountLinkedMsg: AccountLinkedQueueMessage = {
-                provider: inputDto.provider,
-                userId: inputDto.userId,
-                scope: inputDto.scope,
-              }
-              try {
-                mqChannel.sendToQueue(
-                  serverEnv.rabbitmq.accountLinkedQueueName,
-                  Buffer.from(JSON.stringify(accountLinkedMsg))
-                )
-              } catch (mqSendErr) {
-                logger.warn('Error sending account_linked message to queue', {
-                  mqSendErr: makeErrorSerializable(coalesceError(mqSendErr)),
-                  accountLinkedMsg,
-                })
-              }
-            }
-          )
-      )
-
-      app.delete('/providers/:provider/accounts/:providerAccountId/unlink', async (req, res) =>
-        handleErrors(
-          { req, res, defaultErrorMessage: 'Error unlinking provider account' },
-          async () => {
-            const { provider, providerAccountId } = req.params
-
-            const routeParamValResult = startSelfClosingActiveSpan(
-              tracer,
-              'param-validation',
-              () => !!(provider && providerAccountId)
-            )
-
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).send()
-            }
-
-            const result = await mongoAuthAdapter.unlinkAccount!({ provider, providerAccountId })
-
-            if (!result) {
-              res.status(404).json({
-                error: true,
-                message: `Provider account "${provider}, ${providerAccountId}" not found`,
-              })
-            } else {
-              res.json(result)
-            }
+          // TODO: Add fault tolerance and fallback logic (send direct to notification service)
+          const accountLinkedMsg: AccountLinkedQueueMessage = {
+            provider: inputDto.provider,
+            userId: inputDto.userId,
+            scope: inputDto.scope,
           }
-        )
-      )
-
-      app.get('/sessions/:sessionToken/with-user', async (req, res) =>
-        handleErrors(
-          { req, res, defaultErrorMessage: 'Error getting session and user' },
-          async () => {
-            const routeParamValResult = startSelfClosingActiveSpan(
-              tracer,
-              'param-validation',
-              () => z.uuidv4().safeParse(req.params.sessionToken).success
+          try {
+            mqChannel.sendToQueue(
+              serverEnv.rabbitmq.accountLinkedQueueName,
+              Buffer.from(JSON.stringify(accountLinkedMsg))
             )
-
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).send()
-            }
-
-            const result = await mongoAuthAdapter.getSessionAndUser!(req.params.sessionToken)
-
-            if (!result) {
-              res.status(404).json({
-                error: true,
-                message: `Session with token "${req.params.sessionToken}" not found`,
-              })
-            } else {
-              res.status(200).json(result)
-            }
+          } catch (mqSendErr) {
+            logger.warn('Error sending account_linked message to queue', {
+              mqSendErr: makeErrorSerializable(coalesceError(mqSendErr)),
+              accountLinkedMsg,
+            })
           }
-        )
+        }
       )
+
+      app.delete('/providers/:provider/accounts/:providerAccountId/unlink', async (req, res) => {
+        const { provider, providerAccountId } = req.params
+
+        const routeParamValResult = startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          () => !!(provider && providerAccountId)
+        )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
+
+        const result = await mongoAuthAdapter.unlinkAccount!({ provider, providerAccountId })
+
+        if (!result) {
+          res.status(404).json({
+            error: true,
+            message: `Provider account "${provider}, ${providerAccountId}" not found`,
+          })
+        } else {
+          res.json(result)
+        }
+      })
+
+      app.get('/sessions/:sessionToken/with-user', async (req, res) => {
+        const routeParamValResult = startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          () => z.uuidv4().safeParse(req.params.sessionToken).success
+        )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
+
+        const result = await mongoAuthAdapter.getSessionAndUser!(req.params.sessionToken)
+
+        if (!result) {
+          res.status(404).json({
+            error: true,
+            message: `Session with token "${req.params.sessionToken}" not found`,
+          })
+        } else {
+          res.status(200).json(result)
+        }
+      })
 
       app.post(
         '/sessions',
@@ -487,11 +426,10 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors({ req, res, defaultErrorMessage: 'Error creating session' }, async () => {
-            const result = await mongoAuthAdapter.createSession!(res.locals.parsedBody)
-            res.status(201).json(result)
-          })
+        async (req, res) => {
+          const result = await mongoAuthAdapter.createSession!(res.locals.parsedBody)
+          res.status(201).json(result)
+        }
       )
 
       app.put(
@@ -507,26 +445,7 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors({ req, res, defaultErrorMessage: 'Error updating session' }, async () => {
-            const routeParamValResult = startSelfClosingActiveSpan(
-              tracer,
-              'param-validation',
-              () => z.uuidv4().safeParse(req.params.sessionToken).success
-            )
-
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).send()
-            }
-
-            const result = await mongoAuthAdapter.updateSession!(res.locals.parsedBody)
-            res.status(200).json(result)
-          })
-      )
-
-      app.delete('/sessions/:sessionToken', async (req, res) =>
-        handleErrors({ req, res, defaultErrorMessage: 'Error deleting session' }, async () => {
+        async (req, res) => {
           const routeParamValResult = startSelfClosingActiveSpan(
             tracer,
             'param-validation',
@@ -538,18 +457,34 @@ async function main() {
             return res.status(404).send()
           }
 
-          const result = await mongoAuthAdapter.deleteSession!(req.params.sessionToken)
-
-          if (!result) {
-            res.status(404).json({
-              error: true,
-              message: `Session with token "${req.params.sessionToken}" not found`,
-            })
-          } else {
-            res.status(200).json(result)
-          }
-        })
+          const result = await mongoAuthAdapter.updateSession!(res.locals.parsedBody)
+          res.status(200).json(result)
+        }
       )
+
+      app.delete('/sessions/:sessionToken', async (req, res) => {
+        const routeParamValResult = startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          () => z.uuidv4().safeParse(req.params.sessionToken).success
+        )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
+
+        const result = await mongoAuthAdapter.deleteSession!(req.params.sessionToken)
+
+        if (!result) {
+          res.status(404).json({
+            error: true,
+            message: `Session with token "${req.params.sessionToken}" not found`,
+          })
+        } else {
+          res.status(200).json(result)
+        }
+      })
 
       app.post(
         '/verification-tokens',
@@ -564,48 +499,41 @@ async function main() {
             beforeErrorRespond: beforeValidationErrorRespond,
             logger,
           }),
-        async (req, res) =>
-          handleErrors(
-            { req, res, defaultErrorMessage: 'Error creating verification token' },
-            async () => {
-              const result = await mongoAuthAdapter.createVerificationToken!(res.locals.parsedBody)
-              res.status(201).json(result)
-            }
-          )
+        async (req, res) => {
+          const result = await mongoAuthAdapter.createVerificationToken!(res.locals.parsedBody)
+          res.status(201).json(result)
+        }
       )
 
-      app.delete('/verification-tokens/:identifier/use/:token', async (req, res) =>
-        handleErrors(
-          { req, res, defaultErrorMessage: 'Error using verification token' },
-          async () => {
-            const { identifier, token } = req.params
+      app.delete('/verification-tokens/:identifier/use/:token', async (req, res) => {
+        const { identifier, token } = req.params
 
-            const routeParamValResult = startSelfClosingActiveSpan(
-              tracer,
-              'param-validation',
-              () => !!(identifier && token)
-            )
-
-            // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
-            if (!routeParamValResult) {
-              return res.status(404).send()
-            }
-
-            const result = await mongoAuthAdapter.useVerificationToken!({ identifier, token })
-
-            if (!result) {
-              res.status(404).json({ error: true, message: `Verification token not found` })
-            } else {
-              res.status(200).json(result)
-            }
-          }
+        const routeParamValResult = startSelfClosingActiveSpan(
+          tracer,
+          'param-validation',
+          () => !!(identifier && token)
         )
-      )
+
+        // return 404 if invalid route params (needs to be vague so potential attackers can't infer details of system)
+        if (!routeParamValResult) {
+          return res.status(404).send()
+        }
+
+        const result = await mongoAuthAdapter.useVerificationToken!({ identifier, token })
+
+        if (!result) {
+          res.status(404).json({ error: true, message: `Verification token not found` })
+        } else {
+          res.status(200).json(result)
+        }
+      })
 
       // Not found
       app.use((req, res) => {
         res.status(404).json({ error: true, message: 'Not found' })
       })
+
+      app.use(ApiUncaughtHandler)
 
       // Start listening
       if (serverEnv.disableInternalMtls) {
