@@ -32,7 +32,6 @@ import { validBulkOpParams } from './lib/valid-bulk-op-params.ts'
 
 // Server settings
 const serviceName = 'task-service'
-const servicePort = 3002
 
 // generic validation error logger
 const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond'] = ({
@@ -57,6 +56,8 @@ async function main() {
     try {
       const serverEnv = getServerConfig()
       console.info('Sever Config', redactedServerConfig(serverEnv))
+
+      const servicePort = serverEnv.taskSvc.port
 
       const app = express()
       app.set('trust proxy', true)

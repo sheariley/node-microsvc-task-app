@@ -1,22 +1,14 @@
 import './instrumentation.ts'
 
 import otel from '@opentelemetry/api'
-import {
-  getServerConfig,
-  makeErrorSerializable,
-  redactedServerConfig
-} from 'ms-task-app-common'
-import {
-  connectMongoDbWithRetry,
-  connectMQWithRetry,
-  type AccountLinkedQueueMessage,
-  type TaskCreatedQueueMessage,
-  type TaskUpdatedQueueMessage,
-} from 'ms-task-app-service-util'
-import { reportExceptionIfActiveSpan } from 'ms-task-app-telemetry'
+import { coalesceError, getServerConfig, redactedServerConfig } from 'ms-task-app-common'
+import { connectMongoDbWithRetry } from 'ms-task-app-service-util'
 
 import logger from './lib/logger.ts'
 import { createMailer } from './lib/mailer.ts'
+import { startHttpListener } from './listeners/http-listener.ts'
+import type { MessageHandlerMap } from './listeners/listener-types.ts'
+import { startMqListener } from './listeners/mq-listener.ts'
 import {
   createAccountLinkedMessageHandler,
   createTaskCreatedMessageHandler,
@@ -38,29 +30,6 @@ async function main() {
     try {
       const serverEnv = getServerConfig()
       console.info('Sever Config', redactedServerConfig(serverEnv))
-
-      const {
-        mqConnection,
-        mqChannel,
-        error: mqError,
-      } = (await connectMQWithRetry({
-        host: serverEnv.rabbitmq.host,
-        port: serverEnv.rabbitmq.port,
-        tls: serverEnv.disableInternalMtls ? undefined : serverEnv.notifySvc,
-        logger,
-      }))!
-
-      if (mqError || !mqConnection || !mqChannel) {
-        process.exit(1)
-      }
-
-      logger.info('Asserting message queues...')
-      await tracer.startActiveSpan('rabbitmq-assert', async rabbitMqAssertSpan => {
-        await mqChannel.assertQueue(serverEnv.rabbitmq.taskCreatedQueueName)
-        await mqChannel.assertQueue(serverEnv.rabbitmq.taskUpdatedQueueName)
-        await mqChannel.assertQueue(serverEnv.rabbitmq.accountLinkedQueueName)
-        rabbitMqAssertSpan.end()
-      })
 
       const { connection: userDbCon, error: userDbConError } = await tracer.startActiveSpan(
         'mongodb-connect',
@@ -100,93 +69,25 @@ async function main() {
         }
       )
 
-      const handleTaskCreatedMsg = createTaskCreatedMessageHandler(tracer, mailer)
-      const handleTaskUpdatedMsg = createTaskUpdatedMessageHandler(tracer, mailer)
-      const handleAccountLinkedMsg = createAccountLinkedMessageHandler(tracer, mailer)
+      const { accountLinkedQueueName, taskCreatedQueueName, taskUpdatedQueueName } =
+        serverEnv.rabbitmq
+      const handlers: MessageHandlerMap = {
+        [accountLinkedQueueName]: createAccountLinkedMessageHandler(tracer, mailer),
+        [taskCreatedQueueName]: createTaskCreatedMessageHandler(tracer, mailer),
+        [taskUpdatedQueueName]: createTaskUpdatedMessageHandler(tracer, mailer),
+      }
 
-      mqChannel.consume(serverEnv.rabbitmq.taskCreatedQueueName, async msg => {
-        if (msg) {
-          try {
-            const payload: TaskCreatedQueueMessage = JSON.parse(msg.content.toString())
-            await handleTaskCreatedMsg(payload)
-            mqChannel.ack(msg)
-          } catch (error) {
-            try {
-              mqChannel.nack(msg)
-            } catch {
-              // swallow
-            }
-            let coercedError: Error
-            if (error instanceof Error) coercedError = error
-            else coercedError = new Error('Error sending notification email', { cause: error })
+      logger.info('Starting HTTP message listener')
+      await startHttpListener({ handlers, serviceName, tracer })
 
-            reportExceptionIfActiveSpan(coercedError)
-            logger.error('Error sending notification email', {
-              error: makeErrorSerializable(coercedError),
-              content: msg.content.toString(),
-            })
-          }
-        }
-      })
-
-      mqChannel.consume(serverEnv.rabbitmq.taskUpdatedQueueName, async msg => {
-        if (msg) {
-          try {
-            const payload: TaskUpdatedQueueMessage = JSON.parse(msg.content.toString())
-            await handleTaskUpdatedMsg(payload)
-            mqChannel.ack(msg)
-          } catch (error) {
-            try {
-              mqChannel.nack(msg)
-            } catch {
-              // swallow
-            }
-            let coercedError: Error
-            if (error instanceof Error) coercedError = error
-            else coercedError = new Error('Error sending notification email', { cause: error })
-
-            reportExceptionIfActiveSpan(coercedError)
-            logger.error('Error sending notification email', {
-              error: makeErrorSerializable(coercedError),
-              content: msg.content.toString(),
-            })
-          }
-        }
-      })
-
-      mqChannel.consume(serverEnv.rabbitmq.accountLinkedQueueName, async msg => {
-        if (msg) {
-          try {
-            const payload: AccountLinkedQueueMessage = JSON.parse(msg.content.toString())
-            await handleAccountLinkedMsg(payload)
-            mqChannel.ack(msg)
-          } catch (error) {
-            try {
-              mqChannel.nack(msg)
-            } catch {
-              // swallow
-            }
-            let coercedError: Error
-            if (error instanceof Error) coercedError = error
-            else coercedError = new Error('Error sending notification email', { cause: error })
-
-            reportExceptionIfActiveSpan(coercedError)
-            logger.error('Error sending notification email', {
-              error: makeErrorSerializable(coercedError),
-              content: msg.content.toString(),
-            })
-          }
-        }
-      })
+      logger.info('Starting MQ message listener')
+      await startMqListener({ handlers, tracer })
 
       logger.info(`${serviceName} startup successful. Listening for messages...`)
     } catch (error) {
-      let coercedError: Error
-      if (error instanceof Error) coercedError = error
-      else coercedError = new Error('Fatal exception during startup', { cause: error })
-
-      logger.fatal('Fatal error during startup', coercedError)
-      startupSpan.recordException(coercedError)
+      const coalescedError = coalesceError(error, 'Fatal exception during startup')
+      logger.fatal('Fatal error during startup', coalescedError)
+      startupSpan.recordException(coalescedError)
       startupSpan.end()
       process.exit(1)
     } finally {

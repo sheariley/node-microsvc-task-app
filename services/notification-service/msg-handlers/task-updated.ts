@@ -34,9 +34,10 @@ export function createTaskUpdatedMessageHandler(tracer: otel.Tracer, mailer: Mai
       )
     )
 
-    logger.info(
-      `Task update email notification sent. TaskId: ${payload.taskId}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
-    )
+    logger.info(`Task update email notification sent.`, {
+      payload,
+      messageId: mailResult.messageId,
+    })
     deferred.resolve()
 
     return deferred.promise

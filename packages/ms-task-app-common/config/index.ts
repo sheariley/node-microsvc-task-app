@@ -40,7 +40,7 @@ export type TaskAppServerConfig = {
   webUi: WebServiceConfig
   oauthSvc: WebServiceConfig
   taskSvc: WebServiceConfig
-  notifySvc: { fromEmail?: string } & ServiceConfig
+  notifySvc: { fromEmail?: string } & WebServiceConfig
 }
 
 export type GetServerConfigOptions = {
@@ -136,9 +136,11 @@ export function getServerConfig(): TaskAppServerConfig {
     },
 
     notifySvc: {
+      fromEmail: process.env.NOTIFY_SVC__FROM_EMAIL ?? CONFIG_DEFAULTS.notifySvc.fromEmail,
       logPath: process.env.NOTIFY_SVC__LOG_PATH ?? CONFIG_DEFAULTS.notifySvc.logPath,
       logLevel: coerceLogLevel(process.env.NOTIFY_SVC__LOG_LEVEL, CONFIG_DEFAULTS.notifySvc.logLevel),
-      fromEmail: process.env.NOTIFY_SVC__FROM_EMAIL ?? CONFIG_DEFAULTS.notifySvc.fromEmail,
+      host: process.env.NOTIFY_SVC__HOST ?? CONFIG_DEFAULTS.notifySvc.host,
+      port: Number(process.env.NOTIFY_SVC__PORT ?? CONFIG_DEFAULTS.notifySvc.port),
       privateKeyPath:
         process.env.NOTIFY_SVC__PRIVATE_KEY_PATH ?? CONFIG_DEFAULTS.notifySvc.privateKeyPath,
       certPath: process.env.NOTIFY_SVC__CERT_PATH ?? CONFIG_DEFAULTS.notifySvc.certPath,
@@ -217,9 +219,11 @@ const CONFIG_DEFAULTS: TaskAppServerConfig = {
     keyCertComboPath: '../../.certs/task-service/task-service.pem',
   },
   notifySvc: {
+    fromEmail: 'noreply@notification-service.local',
     logPath: '../../logs/notification-service.log',
     logLevel: LogLevel.info,
-    fromEmail: 'noreply@notification-service.local',
+    host: 'notification-service',
+    port: 3003,
     privateKeyPath: '../../.certs/notification-service/notification-service.key.pem',
     certPath: '../../.certs/notification-service/notification-service.cert.pem',
     caCertPath: '../../.certs/ca/ca.cert.pem',

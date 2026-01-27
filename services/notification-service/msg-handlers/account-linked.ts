@@ -5,11 +5,12 @@ import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry/instrumentatio
 
 import logger from '../lib/logger.ts'
 import type { Mailer } from '../lib/mailer.ts'
+import type { MessagerHandler } from './msg-handler-types.ts'
 
 export function createAccountLinkedMessageHandler(
   tracer: otel.Tracer,
   mailer: Mailer
-) {
+): MessagerHandler<AccountLinkedQueueMessage> {
   return async (payload: AccountLinkedQueueMessage) => {
     const deferred = Promise.withResolvers<void>()
 
@@ -39,9 +40,10 @@ export function createAccountLinkedMessageHandler(
       )
     )
 
-    logger.info(
-      `Account link email notification sent. Provider: ${payload.provider}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
-    )
+    logger.info(`Account link email notification sent.`, {
+      payload,
+      messageId: mailResult.messageId,
+    })
 
     deferred.resolve()
 

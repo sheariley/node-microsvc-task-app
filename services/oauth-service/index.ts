@@ -41,7 +41,6 @@ import logger from './lib/logger.ts'
 
 // Server settings
 const serviceName = 'oauth-service'
-const servicePort = 3001
 
 async function createMongoClient(serverEnv: TaskAppServerConfig) {
   const uri = `mongodb://${serverEnv.mongodb.host}:${serverEnv.mongodb.port}/oauth`
@@ -91,6 +90,8 @@ async function main() {
     try {
       const serverEnv = getServerConfig()
       console.info('Sever Config', redactedServerConfig(serverEnv))
+
+      const servicePort = serverEnv.oauthSvc.port
 
       const app = express()
       app.set('trust proxy', true)

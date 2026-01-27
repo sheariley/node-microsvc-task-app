@@ -38,7 +38,11 @@ export function createTaskCreatedMessageHandler(
     )
     
     logger.info(
-      `Task creation email notification sent. TaskId: ${payload.taskId}, UserId: ${payload.userId}, MessageId: ${mailResult.messageId}`
+      `Task creation email notification sent.`,
+      {
+        payload,
+        messageId: mailResult.messageId
+      }
     )
     deferred.resolve()
 
