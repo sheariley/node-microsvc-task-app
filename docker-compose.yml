@@ -234,6 +234,8 @@ services:
       - OAUTH_SVC__PRIVATE_KEY_PATH=/run/secrets/oauth-service.key.pem
       - OAUTH_SVC__CERT_PATH=/run/secrets/oauth-service.cert.pem
       - OAUTH_SVC__KEY_CERT_COMBO_PATH=/run/secrets/oauth-service.pem
+      - NOTIFY_SVC__HOST=${NOTIFY_SVC__HOST}
+      - NOTIFY_SVC__PORT=${NOTIFY_SVC__PORT}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
     volumes:
       - service_logs:/run/logs
@@ -292,6 +294,8 @@ services:
       - TASK_SVC__PRIVATE_KEY_PATH=/run/secrets/task-service.key.pem
       - TASK_SVC__CERT_PATH=/run/secrets/task-service.cert.pem
       - TASK_SVC__KEY_CERT_COMBO_PATH=/run/secrets/task-service.pem
+      - NOTIFY_SVC__HOST=${NOTIFY_SVC__HOST}
+      - NOTIFY_SVC__PORT=${NOTIFY_SVC__PORT}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
     volumes:
       - service_logs:/run/logs
@@ -333,6 +337,8 @@ services:
     profiles: [full]
     networks:
       - backend
+    ports:
+      - "${NOTIFY_SVC__PORT}:3003"
     environment:
       - NOTIFY_SVC__LOG_PATH=${NOTIFY_SVC__LOG_PATH}
       - NOTIFY_SVC__FROM_EMAIL=noreply@notification-service.local
@@ -351,6 +357,8 @@ services:
       - NOTIFY_SVC__PRIVATE_KEY_PATH=/run/secrets/notification-service.key.pem
       - NOTIFY_SVC__CERT_PATH=/run/secrets/notification-service.cert.pem
       - NOTIFY_SVC__KEY_CERT_COMBO_PATH=/run/secrets/notification-service.pem
+      - NOTIFY_SVC__HOST=${NOTIFY_SVC__HOST}
+      - NOTIFY_SVC__PORT=${NOTIFY_SVC__PORT}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
     volumes:
       - service_logs:/run/logs
@@ -381,6 +389,12 @@ services:
         condition: service_started
       init-volumes:
         condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -k --cert /run/secrets/notification-service.cert.pem --key /run/secrets/notification-service.key.pem --silent --fail \"https://localhost:3003/ping\" || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   web-ui:

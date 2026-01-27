@@ -137,7 +137,7 @@ COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 RUN npm run build:${SVC_NAME}
 
 FROM runtime_base AS runtime_oauth_service
-ARG SVC_NAME=oauth-service OAUTH_SVC_PORT=3001
+ARG SVC_NAME=oauth-service OAUTH_SVC__PORT=3001
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
@@ -150,7 +150,7 @@ COPY --from=build_oauth_service /repo/services/${SVC_NAME}/package.json ./servic
 # Install runtime pkg depends
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
-EXPOSE ${OAUTH_SVC_PORT}
+EXPOSE ${OAUTH_SVC__PORT}
 
 USER svc
 
@@ -183,7 +183,7 @@ COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 RUN npm run build:${SVC_NAME}
 
 FROM runtime_base AS runtime_task_service
-ARG SVC_NAME=task-service TASK_SVC_PORT=3002
+ARG SVC_NAME=task-service TASK_SVC__PORT=3002
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
@@ -196,7 +196,7 @@ COPY --from=build_task_service /repo/services/${SVC_NAME}/package.json ./service
 # Install runtime pkg depends
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
 
-EXPOSE ${TASK_SVC_PORT}
+EXPOSE ${TASK_SVC__PORT}
 
 USER svc
 
@@ -228,7 +228,7 @@ COPY ./services/${SVC_NAME} ./services/${SVC_NAME}/
 RUN npm run build:${SVC_NAME}
 
 FROM runtime_base AS runtime_notification_service
-ARG SVC_NAME=notification-service
+ARG SVC_NAME=notification-service NOTIFY_SVC__PORT=3003
 ENV NODE_ENV=production SVC_NAME=${SVC_NAME}
 WORKDIR /app
 
@@ -240,6 +240,8 @@ COPY --from=build_notification_service /repo/services/${SVC_NAME}/package.json .
 
 # Install runtime pkg depends
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
+
+EXPOSE ${NOTIFY_SVC__PORT}
 
 USER svc
 
