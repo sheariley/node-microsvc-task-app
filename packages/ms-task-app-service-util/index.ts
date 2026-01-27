@@ -1,4 +1,5 @@
 export * from './db/index.ts'
 export * from './express/index.ts'
 export * from './mq/index.ts'
+export * from './notification-client/index.ts'
 export * from './types/index.ts'

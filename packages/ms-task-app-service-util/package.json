@@ -12,6 +12,22 @@
     ".": {
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./db": {
+      "import": "./dist/db/index.js",
+      "default": "./dist/db/index.js"
+    },
+    "./express": {
+      "import": "./dist/express/index.js",
+      "default": "./dist/express/index.js"
+    },
+    "./mq": {
+      "import": "./dist/mq/index.js",
+      "default": "./dist/mq/index.js"
+    },
+    "./notification-client": {
+      "import": "./dist/notification-clinet/index.js",
+      "default": "./dist/notification-clinet/index.js"
     }
   },
   "files": [
@@ -26,6 +42,7 @@
     "mongoose": "^9.0.1",
     "ms-task-app-common": "0.0.0",
     "ms-task-app-dto": "0.0.0",
+    "ms-task-app-mtls": "0.0.0",
     "ms-task-app-telemetry": "0.0.0",
     "pino": "^10.1.1",
     "zod": "^4.2.1"

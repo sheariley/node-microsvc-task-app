@@ -7,6 +7,7 @@ import { isJsonValue } from './json-helpers.ts'
 const DefaultDefaultErrorMsg = 'Unknown error'
 
 export function coalesceErrorMsg(error: unknown, defaultMsg = DefaultDefaultErrorMsg) {
+  if (typeof error === 'undefined' || error === null) return defaultMsg
   return isErrorLike(error)
     ? error.message
     : typeof (error as any).toString === 'function'

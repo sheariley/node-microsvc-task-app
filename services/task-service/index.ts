@@ -4,8 +4,6 @@ import otel from '@opentelemetry/api'
 import bodyParser from 'body-parser'
 import express, { type RequestHandler } from 'express'
 import type { Query, Response } from 'express-serve-static-core'
-import fs from 'fs'
-import https from 'https'
 import mongoose from 'mongoose'
 import { checkClientCert } from 'ms-task-app-auth'
 import { getServerConfig, redactedServerConfig, type JsonValue } from 'ms-task-app-common'
@@ -14,15 +12,15 @@ import { getTaskModel } from 'ms-task-app-entities'
 import {
   ApiUncaughtHandler,
   connectMongoDbWithRetry,
-  connectMQWithRetry,
+  createNotificationClient,
   disableResponseCaching,
   startMtlsHttpServer,
   validInputDto,
   type InputDtoValidatorOptions,
   type TaskCreatedQueueMessage,
-  type TaskUpdatedQueueMessage,
+  type TaskUpdatedQueueMessage
 } from 'ms-task-app-service-util'
-import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
+import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import { pinoHttp } from 'pino-http'
 
 import { authenticatedUser } from './lib/authenticated-user.ts'
@@ -76,28 +74,26 @@ async function main() {
       app.use(bodyParser.json())
       app.use(disableResponseCaching)
 
-      const {
-        mqConnection,
-        mqChannel,
-        error: mqError,
-      } = await startSelfClosingActiveSpan(tracer, 'rabbitmq-connect', () =>
-        connectMQWithRetry({
-          host: serverEnv.rabbitmq.host,
-          port: serverEnv.rabbitmq.port,
-          tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
-          logger,
-        })
+      logger.info('Creating notification client')
+      const notifyClient = await startSelfClosingActiveSpan(
+        tracer,
+        'create-notification-client',
+        () =>
+          createNotificationClient({
+            mqHost: serverEnv.rabbitmq.host,
+            mqPort: serverEnv.rabbitmq.port,
+            queueNames: [
+              serverEnv.rabbitmq.taskCreatedQueueName,
+              serverEnv.rabbitmq.taskUpdatedQueueName,
+            ],
+            failover: {
+              httpHost: serverEnv.notifySvc.host,
+              httpPort: serverEnv.notifySvc.port,
+            },
+            tls: serverEnv.disableInternalMtls ? undefined : serverEnv.taskSvc,
+            logger,
+          })
       )
-
-      if (mqError || !mqConnection || !mqChannel) {
-        process.exit(1)
-      }
-
-      logger.info('Asserting message queues...')
-      await startSelfClosingActiveSpan(tracer, 'rabbitmq-assert', async () => {
-        await mqChannel.assertQueue(serverEnv.rabbitmq.taskCreatedQueueName)
-        await mqChannel.assertQueue(serverEnv.rabbitmq.taskUpdatedQueueName)
-      })
 
       const { connection: taskDbCon, error: taskDbConError } = await startSelfClosingActiveSpan(
         tracer,
@@ -250,20 +246,12 @@ async function main() {
           })
           await task.save()
 
-          // TODO: Add fault tolerance logic here
-          if (!mqChannel) {
-            return res.status(503).json({ error: true, message: 'RabbitMQ channel not connected' })
-          } else {
-            const taskCreatedMsg: TaskCreatedQueueMessage = {
-              taskId: task._id.toString(),
-              userId: userId!,
-              title,
-            }
-            mqChannel.sendToQueue(
-              serverEnv.rabbitmq.taskCreatedQueueName,
-              Buffer.from(JSON.stringify(taskCreatedMsg))
-            )
+          const taskCreatedMsg: TaskCreatedQueueMessage = {
+            taskId: task._id.toString(),
+            userId: userId!,
+            title,
           }
+          notifyClient.send(serverEnv.rabbitmq.taskCreatedQueueName, taskCreatedMsg)
 
           res.status(201).json(task)
         }
@@ -370,23 +358,15 @@ async function main() {
             return res.status(404).json({ error: true, message: 'Task not found' })
           }
 
-          // TODO: Add fault tolerance logic here
-          if (!mqChannel) {
-            return res.status(503).json({ error: true, message: 'RabbitMQ channel not connected' })
-          } else {
-            const taskUpdatedMsg: TaskUpdatedQueueMessage = {
-              taskId: task._id.toString(),
-              userId: userId!,
-              title: task.title,
-              description: task.description,
-              completed: task.completed,
-            }
-            mqChannel.sendToQueue(
-              serverEnv.rabbitmq.taskUpdatedQueueName,
-              Buffer.from(JSON.stringify(taskUpdatedMsg))
-            )
+          const taskUpdatedMsg: TaskUpdatedQueueMessage = {
+            taskId: task._id.toString(),
+            userId: userId!,
+            title: task.title,
+            description: task.description,
+            completed: task.completed,
           }
-
+          notifyClient.send(serverEnv.rabbitmq.taskUpdatedQueueName, taskUpdatedMsg)
+          
           res.status(204).send()
         }
       )

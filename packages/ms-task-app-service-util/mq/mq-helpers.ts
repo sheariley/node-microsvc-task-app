@@ -9,6 +9,7 @@ export type MqConnectOptions = {
   retries?: number
   delay?: number
   initialDelay?: number
+  heartbeat?: number
   tls?: {
     caCertPath: string
     certPath: string
@@ -23,6 +24,7 @@ export async function connectMQWithRetry({
   retries = 5,
   delay = 3000,
   initialDelay = 7000,
+  heartbeat = 30,
   tls,
   logger = DefaultConsoleLogger,
 }: MqConnectOptions) {
@@ -57,6 +59,7 @@ export async function connectMQWithRetry({
           hostname: host,
           port,
           protocol,
+          heartbeat
         },
         socketOptions
       )
