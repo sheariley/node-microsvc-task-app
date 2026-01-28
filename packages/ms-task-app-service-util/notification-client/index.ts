@@ -9,7 +9,7 @@ import {
 import { createMtlsFetcher } from 'ms-task-app-mtls'
 import { DefaultConsoleLogger, type ILogger } from 'ms-task-app-telemetry'
 
-import { createPersistentMQClient } from '../mq/mq-helpers.ts'
+import { createPersistentMQClient } from '../mq/persistent-mq-client.ts'
 import { OTEL_SERVICE_NAME } from '../otel/index.ts'
 
 export type NotificationClientOptions = {
