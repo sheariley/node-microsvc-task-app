@@ -1,10 +1,7 @@
 import { trace } from '@opentelemetry/api'
 import { type Channel, type ChannelModel } from 'amqplib'
-import { coalesceError } from 'ms-task-app-common'
-import {
-  DefaultConsoleLogger,
-  reportExceptionIfActiveSpan
-} from 'ms-task-app-telemetry'
+import { coalesceError, makeErrorSerializable } from 'ms-task-app-common'
+import { DefaultConsoleLogger, reportExceptionIfActiveSpan } from 'ms-task-app-telemetry'
 
 import { OTEL_SERVICE_NAME } from '../otel/index.ts'
 import { type MqConnectOptions, connectMQWithRetry } from './connect-mq-with-retry.ts'
@@ -111,15 +108,29 @@ export async function createPersistentMQClient({
 
         if (consumerQueueNames.length) {
           for (let queueName of consumerQueueNames) {
-            mqChannel.consume(queueName, msg => {
+            mqChannel.consume(queueName, async msg => {
               if (msg) {
+                const msgContent = msg.content.toString()
                 try {
-                  const payload = JSON.parse(msg.content.toString())
-                  consumers![queueName]!(payload)
+                  const payload = JSON.parse(msgContent)
+                  try {
+                    await consumers![queueName]!(payload)
+                    mqChannel!.ack(msg)
+                  } catch (consumerError) {
+                    const coalescedError = coalesceError(consumerError)
+                    logger.error('Error occurred in MQ consumer', {
+                      err: makeErrorSerializable(coalescedError),
+                      queueName,
+                    })
+                    mqChannel!.nack(msg)
+                  }
                 } catch (error) {
                   const coalescedError = coalesceError(error)
                   reportExceptionIfActiveSpan(coalescedError)
-                  logger.error('Error while consuming message', coalescedError)
+                  logger.error('Error deserializing message', {
+                    err: makeErrorSerializable(coalescedError),
+                    content: msgContent,
+                  })
                 }
               }
             })
