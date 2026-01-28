@@ -4,18 +4,14 @@ import { MongoDBAdapter } from '@auth/mongodb-adapter'
 import otel from '@opentelemetry/api'
 import bodyParser from 'body-parser'
 import express from 'express'
-import fs from 'fs'
-import https from 'https'
 import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 import mongoose from 'mongoose'
 import { checkClientCert } from 'ms-task-app-auth'
 import {
-  coalesceError,
   getServerConfig,
-  makeErrorSerializable,
   redactedServerConfig,
   type JsonValue,
-  type TaskAppServerConfig,
+  type TaskAppServerConfig
 } from 'ms-task-app-common'
 import {
   AccountInputDtoSchema,
@@ -26,14 +22,14 @@ import {
 } from 'ms-task-app-dto'
 import {
   ApiUncaughtHandler,
-  connectMQWithRetry,
+  createNotificationClient,
   disableResponseCaching,
   startMtlsHttpServer,
   validInputDto,
   type AccountLinkedQueueMessage,
-  type InputDtoValidatorOptions,
+  type InputDtoValidatorOptions
 } from 'ms-task-app-service-util'
-import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
+import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import { pinoHttp } from 'pino-http'
 import * as z from 'zod'
 
@@ -80,7 +76,7 @@ const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond
 
 async function main() {
   process.on('uncaughtException', err => {
-    logger.fatal('Uncaught error during initialization', err)
+    logger.fatal('Uncaught error', err)
     process.exit(1)
   })
 
@@ -109,28 +105,22 @@ async function main() {
       app.use(bodyParser.json())
       app.use(disableResponseCaching)
 
-      const {
-        mqConnection,
-        mqChannel,
-        error: mqError,
-      } = await startSelfClosingActiveSpan(tracer, 'rabbitmq-connect', () =>
-        connectMQWithRetry({
-          host: serverEnv.rabbitmq.host,
-          port: serverEnv.rabbitmq.port,
-          tls: serverEnv.disableInternalMtls ? undefined : serverEnv.oauthSvc,
-          logger,
-        })
-      )
-
-      if (mqError || !mqConnection || !mqChannel) {
-        process.exit(1)
-      }
-
-      logger.info('Asserting message queues...')
-      await startSelfClosingActiveSpan(
+      logger.info('Creating notification client')
+      const notificationClient = await startSelfClosingActiveSpan(
         tracer,
-        'rabbitmq-assert',
-        async () => await mqChannel.assertQueue(serverEnv.rabbitmq.accountLinkedQueueName)
+        'create-notification-client',
+        () =>
+          createNotificationClient({
+            mqHost: serverEnv.rabbitmq.host,
+            mqPort: serverEnv.rabbitmq.port,
+            queueNames: [serverEnv.rabbitmq.accountLinkedQueueName],
+            failover: {
+              httpHost: serverEnv.notifySvc.host,
+              httpPort: serverEnv.notifySvc.port,
+            },
+            tls: serverEnv.disableInternalMtls ? undefined : serverEnv.oauthSvc,
+            logger,
+          })
       )
 
       const mongoAuthAdapter = await startSelfClosingActiveSpan(
@@ -350,23 +340,12 @@ async function main() {
           const result = await mongoAuthAdapter.linkAccount!(inputDto)
           res.status(201).json(result)
 
-          // TODO: Add fault tolerance and fallback logic (send direct to notification service)
           const accountLinkedMsg: AccountLinkedQueueMessage = {
             provider: inputDto.provider,
             userId: inputDto.userId,
             scope: inputDto.scope,
           }
-          try {
-            mqChannel.sendToQueue(
-              serverEnv.rabbitmq.accountLinkedQueueName,
-              Buffer.from(JSON.stringify(accountLinkedMsg))
-            )
-          } catch (mqSendErr) {
-            logger.warn('Error sending account_linked message to queue', {
-              mqSendErr: makeErrorSerializable(coalesceError(mqSendErr)),
-              accountLinkedMsg,
-            })
-          }
+          notificationClient.send(serverEnv.rabbitmq.accountLinkedQueueName, accountLinkedMsg)
         }
       )
 

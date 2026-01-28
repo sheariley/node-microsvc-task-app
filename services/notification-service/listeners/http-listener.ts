@@ -6,19 +6,23 @@ import type { ApiErrorResponse } from 'ms-task-app-dto'
 import {
   ApiUncaughtHandler,
   disableResponseCaching,
-  startMtlsHttpServer
+  startMtlsHttpServer,
 } from 'ms-task-app-service-util'
 import { reportExceptionIfActiveSpan, startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import { pinoHttp } from 'pino-http'
 
 import logger from '../lib/logger.ts'
-import type { MessageListenerOptions } from './listener-types.ts'
+import type { MessageListenerOptions } from './listener-options.ts'
 
 export type HttpMessageListenerOptions = MessageListenerOptions & {
   serviceName: string
 }
 
-export async function startHttpListener({ handlers, tracer, serviceName }: HttpMessageListenerOptions) {
+export async function startHttpListener({
+  consumers,
+  tracer,
+  serviceName,
+}: HttpMessageListenerOptions) {
   const serverEnv = getServerConfig()
 
   const servicePort = serverEnv.notifySvc.port
@@ -78,7 +82,7 @@ export async function startHttpListener({ handlers, tracer, serviceName }: HttpM
         res.status(200).json({ timestamp: Date.now() })
       })
 
-      const queueNames = Object.keys(handlers)
+      const queueNames = Object.keys(consumers)
 
       logger.info('Initializing HTTP message endpoint')
       app.post(`/message/:queueName`, async (req, res) => {
@@ -90,7 +94,7 @@ export async function startHttpListener({ handlers, tracer, serviceName }: HttpM
         }
         const payload = req.body
         try {
-          await handlers[queueName]!(payload)
+          await consumers[queueName]!(payload)
           res.status(204).send()
         } catch (error) {
           const coalescedError = coalesceError(error, 'Error sending notification email')
@@ -121,7 +125,8 @@ export async function startHttpListener({ handlers, tracer, serviceName }: HttpM
       })
 
       logger.info(
-        `${serviceName} listening on ${serverEnv.disableInternalMtls ? '' : 'secure '}port ${servicePort}`
+        `${serviceName} listening on ${serverEnv.disableInternalMtls ? '' : 'secure '}port ${servicePort}`,
+        { queues: Object.keys(consumers) }
       )
     } catch (err) {
       const coalescedError = coalesceError(err)

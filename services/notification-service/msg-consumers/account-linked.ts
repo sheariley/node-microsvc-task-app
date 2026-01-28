@@ -1,19 +1,16 @@
 import otel from '@opentelemetry/api'
 import { getUserModel } from 'ms-task-app-entities'
-import type { AccountLinkedQueueMessage } from 'ms-task-app-service-util'
+import type { AccountLinkedQueueMessage, MessageConsumer } from 'ms-task-app-service-util'
 import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry/instrumentation'
 
 import logger from '../lib/logger.ts'
 import type { Mailer } from '../lib/mailer.ts'
-import type { MessagerHandler } from './msg-handler-types.ts'
 
 export function createAccountLinkedMessageHandler(
   tracer: otel.Tracer,
   mailer: Mailer
-): MessagerHandler<AccountLinkedQueueMessage> {
+): MessageConsumer<AccountLinkedQueueMessage> {
   return async (payload: AccountLinkedQueueMessage) => {
-    const deferred = Promise.withResolvers<void>()
-
     logger.info('Notification: ACCOUNT LINKED: ', { payload })
 
     const userModel = getUserModel()
@@ -44,9 +41,5 @@ export function createAccountLinkedMessageHandler(
       payload,
       messageId: mailResult.messageId,
     })
-
-    deferred.resolve()
-
-    return deferred.promise
   }
 }

@@ -1,6 +1,6 @@
 import otel from '@opentelemetry/api'
 import { getUserModel } from 'ms-task-app-entities'
-import type { TaskCreatedQueueMessage } from 'ms-task-app-service-util'
+import type { MessageConsumer, TaskCreatedQueueMessage } from 'ms-task-app-service-util'
 import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry/instrumentation'
 
 import logger from '../lib/logger.ts'
@@ -9,10 +9,8 @@ import type { Mailer } from '../lib/mailer.ts'
 export function createTaskCreatedMessageHandler(
   tracer: otel.Tracer,
   mailer: Mailer
-) {
+): MessageConsumer<TaskCreatedQueueMessage> {
   return async (payload: TaskCreatedQueueMessage) => {
-    const deferred = Promise.withResolvers<void>()
-
     logger.info('Notification: TASK CREATED: ', { payload })
 
     const userModel = getUserModel()
@@ -36,16 +34,10 @@ export function createTaskCreatedMessageHandler(
         `A new task was created for you! The title was "${payload.title}".`
       )
     )
-    
-    logger.info(
-      `Task creation email notification sent.`,
-      {
-        payload,
-        messageId: mailResult.messageId
-      }
-    )
-    deferred.resolve()
 
-    return deferred.promise
+    logger.info(`Task creation email notification sent.`, {
+      payload,
+      messageId: mailResult.messageId,
+    })
   }
 }

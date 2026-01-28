@@ -46,7 +46,7 @@ export async function connectMongoDbWithRetry({
       logger.error('MongoDB connection error: ', coalesceError(error))
       retries--
       if (retries > 0) {
-        logger.info('Retrying connection. Retries left: ', retries)
+        logger.info('Retrying connection.', { retriesRemaining: retries })
       } else {
         return { connection: null, error }
       }

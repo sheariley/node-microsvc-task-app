@@ -2,25 +2,24 @@ import './instrumentation.ts'
 
 import otel from '@opentelemetry/api'
 import { coalesceError, getServerConfig, redactedServerConfig } from 'ms-task-app-common'
-import { connectMongoDbWithRetry } from 'ms-task-app-service-util'
+import { connectMongoDbWithRetry, type MessageConsumerMap } from 'ms-task-app-service-util'
 
 import logger from './lib/logger.ts'
 import { createMailer } from './lib/mailer.ts'
 import { startHttpListener } from './listeners/http-listener.ts'
-import type { MessageHandlerMap } from './listeners/listener-types.ts'
 import { startMqListener } from './listeners/mq-listener.ts'
 import {
-  createAccountLinkedMessageHandler,
-  createTaskCreatedMessageHandler,
-  createTaskUpdatedMessageHandler,
-} from './msg-handlers/index.ts'
+  createAccountLinkedMessageHandler as createAccountLinkedMessageConsumer,
+  createTaskCreatedMessageHandler as createTaskCreatedMessageConsumer,
+  createTaskUpdatedMessageHandler as createTaskUpdatedMessageConsumer,
+} from './msg-consumers/index.ts'
 
 // Server settings
 const serviceName = 'notification-service'
 
 async function main() {
   process.on('uncaughtException', err => {
-    logger.fatal('Uncaught error during initialization', err)
+    logger.fatal('Uncaught error', err)
     process.exit(1)
   })
 
@@ -71,17 +70,17 @@ async function main() {
 
       const { accountLinkedQueueName, taskCreatedQueueName, taskUpdatedQueueName } =
         serverEnv.rabbitmq
-      const handlers: MessageHandlerMap = {
-        [accountLinkedQueueName]: createAccountLinkedMessageHandler(tracer, mailer),
-        [taskCreatedQueueName]: createTaskCreatedMessageHandler(tracer, mailer),
-        [taskUpdatedQueueName]: createTaskUpdatedMessageHandler(tracer, mailer),
+      const consumers: MessageConsumerMap = {
+        [accountLinkedQueueName]: createAccountLinkedMessageConsumer(tracer, mailer),
+        [taskCreatedQueueName]: createTaskCreatedMessageConsumer(tracer, mailer),
+        [taskUpdatedQueueName]: createTaskUpdatedMessageConsumer(tracer, mailer),
       }
 
       logger.info('Starting HTTP message listener')
-      await startHttpListener({ handlers, serviceName, tracer })
+      await startHttpListener({ consumers, serviceName, tracer })
 
       logger.info('Starting MQ message listener')
-      await startMqListener({ handlers, tracer })
+      await startMqListener({ consumers, tracer })
 
       logger.info(`${serviceName} startup successful. Listening for messages...`)
     } catch (error) {

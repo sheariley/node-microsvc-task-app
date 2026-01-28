@@ -18,7 +18,7 @@ import {
   validInputDto,
   type InputDtoValidatorOptions,
   type TaskCreatedQueueMessage,
-  type TaskUpdatedQueueMessage
+  type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
 import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
 import { pinoHttp } from 'pino-http'
@@ -44,7 +44,7 @@ const beforeValidationErrorRespond: InputDtoValidatorOptions['beforeErrorRespond
 
 async function main() {
   process.on('uncaughtException', err => {
-    logger.fatal('Uncaught error during initialization', err)
+    logger.fatal('Uncaught error', err)
     process.exit(1)
   })
 
@@ -75,7 +75,7 @@ async function main() {
       app.use(disableResponseCaching)
 
       logger.info('Creating notification client')
-      const notifyClient = await startSelfClosingActiveSpan(
+      const notificationClient = await startSelfClosingActiveSpan(
         tracer,
         'create-notification-client',
         () =>
@@ -251,7 +251,7 @@ async function main() {
             userId: userId!,
             title,
           }
-          notifyClient.send(serverEnv.rabbitmq.taskCreatedQueueName, taskCreatedMsg)
+          notificationClient.send(serverEnv.rabbitmq.taskCreatedQueueName, taskCreatedMsg)
 
           res.status(201).json(task)
         }
@@ -365,8 +365,8 @@ async function main() {
             description: task.description,
             completed: task.completed,
           }
-          notifyClient.send(serverEnv.rabbitmq.taskUpdatedQueueName, taskUpdatedMsg)
-          
+          notificationClient.send(serverEnv.rabbitmq.taskUpdatedQueueName, taskUpdatedMsg)
+
           res.status(204).send()
         }
       )
