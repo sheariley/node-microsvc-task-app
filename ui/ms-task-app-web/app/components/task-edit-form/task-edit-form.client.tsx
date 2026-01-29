@@ -1,7 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { OctagonAlertIcon, SaveIcon, ThumbsUpIcon, XIcon } from 'lucide-react'
+import { OctagonAlertIcon, SaveIcon, ThumbsUpIcon, UndoIcon, XIcon } from 'lucide-react'
 import { coalesceErrorMsg } from 'ms-task-app-common'
 import { TaskDto, TaskInputDto, TaskInputDtoSchema, isTaskDto } from 'ms-task-app-dto'
 import { useRouter } from 'next/navigation'
@@ -34,7 +34,7 @@ export default function TaskEditForm({
   const {
     control,
     handleSubmit,
-    formState: { isSubmitting },
+    formState: { isSubmitting, isDirty },
     reset: resetForm,
   } = useForm<TaskInputDto>({
     mode: 'all',
@@ -50,15 +50,15 @@ export default function TaskEditForm({
     try {
       const id = !!task && isTaskDto(task) ? task._id : undefined
 
-      if (id) {
+      if (id) { // update existing
         await taskClient.updateTask(userId, id, data)
         addToast({
           title: 'Task updated successfully.',
           icon: <ThumbsUpIcon />,
           color: 'success',
         })
-        if (onSubmitted) onSubmitted({ ...task, ...data })
-      } else {
+        if (typeof onSubmitted === 'function') onSubmitted({ ...task, ...data })
+      } else { // create new
         const newTask = await taskClient.createTask(userId, data)
         addToast({
           title: 'Task created successfully.',
@@ -137,7 +137,7 @@ export default function TaskEditForm({
 
                     <Button
                       type="submit"
-                      color="primary"
+                      color="success"
                       disabled={isSubmitting}
                       size="sm"
                       className="gap-0 px-0 sm:gap-2 sm:px-3 sm:[&>svg]:max-w-8"
@@ -188,7 +188,7 @@ export default function TaskEditForm({
             render={({ field }) => (
               <Checkbox
                 className="mb-4"
-                checked={!!field.value}
+                isSelected={!!field.value}
                 onChange={field.onChange}
                 disabled={isSubmitting}
               >
@@ -198,11 +198,11 @@ export default function TaskEditForm({
           />
 
           <div className="flex justify-end gap-2">
-            <Button type="submit" color="primary" disabled={isSubmitting}>
+            <Button type="submit" color="success" isDisabled={!isDirty || isSubmitting}>
               <SaveIcon size="20" /> Save
             </Button>
-            <Button type="button" variant="flat" onPress={() => router.push('/')}>
-              <XIcon size="20" /> Cancel
+            <Button type="button" variant="flat" isDisabled={!isDirty} onPress={() => resetForm()}>
+              <UndoIcon size="20" /> Reset
             </Button>
           </div>
         </>

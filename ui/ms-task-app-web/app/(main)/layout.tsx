@@ -29,7 +29,7 @@ export default function MainLayout({
           </NavbarItem>
         </NavbarContent>
       </Navbar>
-      <main className="flex flex-col items-stretch justify-start py-8 sm:items-center sm:py-16">
+      <main className="flex w-full flex-col items-stretch justify-start py-8 sm:items-center sm:py-16">
         {children}
       </main>
     </>
