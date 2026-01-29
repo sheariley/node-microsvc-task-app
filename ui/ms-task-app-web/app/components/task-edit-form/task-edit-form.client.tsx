@@ -58,6 +58,8 @@ export default function TaskEditForm({
           color: 'success',
         })
         if (typeof onSubmitted === 'function') onSubmitted({ ...task, ...data })
+        router.refresh()
+        resetForm(data)
       } else { // create new
         const newTask = await taskClient.createTask(userId, data)
         addToast({
