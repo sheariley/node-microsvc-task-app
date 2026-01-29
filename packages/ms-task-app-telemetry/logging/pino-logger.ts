@@ -31,10 +31,10 @@ export function createPinoLogger({ logLevel, logPath }: PinoLoggerOptions): IPin
       transport: {
         targets: [
           // output pretty-print to stdout
-          { target: 'pino-pretty' },
+          { target: 'pino-pretty', level: logLevel },
 
           // output to log file
-          { target: 'pino/file', options: { destination: logPath } },
+          { target: 'pino/file', level: logLevel, options: { destination: logPath } },
         ],
       },
       serializers: {
@@ -56,7 +56,7 @@ export function createPinoLogger({ logLevel, logPath }: PinoLoggerOptions): IPin
     }),
     {
       log: baseMethod,
-      pinoInstance: internal
+      pinoInstance: internal,
     }
   ) as IPinoLogger
 }
