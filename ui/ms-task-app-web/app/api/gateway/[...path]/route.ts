@@ -49,7 +49,7 @@ const proxyRequest = auth(async req => {
   let targetBase: string
   try {
     const resolved = await gatewaySvcResolver.resolve(forwardPath || '/', req)
-    serverLogger.info('API gateway route matched', { from: forwardPath || '/', to: resolved.target })
+    serverLogger.info('API gateway route matched', { method: req.method, from: forwardPath || '/', to: resolved.target })
     targetBase = resolved.target
   } catch (err) {
     const coalescedError = coalesceError(err, 'Internal gateway routing error')
