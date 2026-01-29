@@ -9,9 +9,12 @@ import { createMailer } from './lib/mailer.ts'
 import { startHttpListener } from './listeners/http-listener.ts'
 import { startMqListener } from './listeners/mq-listener.ts'
 import {
-  createAccountLinkedMessageHandler as createAccountLinkedMessageConsumer,
-  createTaskCreatedMessageHandler as createTaskCreatedMessageConsumer,
-  createTaskUpdatedMessageHandler as createTaskUpdatedMessageConsumer,
+  createAccountLinkedMessageConsumer,
+  createTaskBulkDeletedMessageConsumer,
+  createTaskBulkUpdateCompletedMessageConsumer,
+  createTaskCreatedMessageConsumer,
+  createTaskDeletedMessageConsumer,
+  createTaskUpdatedMessageConsumer,
 } from './msg-consumers/index.ts'
 
 // Server settings
@@ -28,7 +31,7 @@ async function main() {
   await tracer.startActiveSpan('service-startup', async startupSpan => {
     try {
       const serverEnv = getServerConfig()
-      console.info('Sever Config', redactedServerConfig(serverEnv))
+      console.debug('Sever Config', redactedServerConfig(serverEnv))
 
       const { connection: userDbCon, error: userDbConError } = await tracer.startActiveSpan(
         'mongodb-connect',
@@ -68,12 +71,24 @@ async function main() {
         }
       )
 
-      const { accountLinkedQueueName, taskCreatedQueueName, taskUpdatedQueueName } =
-        serverEnv.rabbitmq
+      const {
+        accountLinkedQueueName,
+        taskCreatedQueueName,
+        taskUpdatedQueueName,
+        taskDeletedQueueName,
+        taskBulkDeletedQueueName,
+        taskBulkUpdateCompletedQueueName,
+      } = serverEnv.rabbitmq
       const consumers: MessageConsumerMap = {
         [accountLinkedQueueName]: createAccountLinkedMessageConsumer(tracer, mailer),
         [taskCreatedQueueName]: createTaskCreatedMessageConsumer(tracer, mailer),
         [taskUpdatedQueueName]: createTaskUpdatedMessageConsumer(tracer, mailer),
+        [taskDeletedQueueName]: createTaskDeletedMessageConsumer(tracer, mailer),
+        [taskBulkDeletedQueueName]: createTaskBulkDeletedMessageConsumer(tracer, mailer),
+        [taskBulkUpdateCompletedQueueName]: createTaskBulkUpdateCompletedMessageConsumer(
+          tracer,
+          mailer
+        ),
       }
 
       logger.info('Starting HTTP message listener')

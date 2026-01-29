@@ -1,3 +1,6 @@
 export * from './account-linked.ts'
+export * from './task-bulk-deleted.ts'
+export * from './task-bulk-update-completed.ts'
 export * from './task-created.ts'
+export * from './task-deleted.ts'
 export * from './task-updated.ts'

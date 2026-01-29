@@ -1,17 +1,17 @@
 import otel from '@opentelemetry/api'
 import { getUserModel } from 'ms-task-app-entities'
-import type { MessageConsumer, TaskBaseQueueMessage } from 'ms-task-app-service-util'
+import type { MessageConsumer, TaskBulkBaseQueueMessage } from 'ms-task-app-service-util'
 import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry/instrumentation'
 
 import logger from '../lib/logger.ts'
 import type { Mailer } from '../lib/mailer.ts'
 
-export function createTaskCreatedMessageConsumer(
+export function createTaskBulkDeletedMessageConsumer(
   tracer: otel.Tracer,
   mailer: Mailer
-): MessageConsumer<TaskBaseQueueMessage> {
-  return async (payload: TaskBaseQueueMessage) => {
-    logger.debug('Notification: TASK CREATED: ', { payload })
+): MessageConsumer<TaskBulkBaseQueueMessage> {
+  return async (payload: TaskBulkBaseQueueMessage) => {
+    logger.debug('Notification: TASKS BULK DELETED', { payload })
 
     const userModel = getUserModel()
 
@@ -30,12 +30,12 @@ export function createTaskCreatedMessageConsumer(
     const mailResult = await startSelfClosingActiveSpan(tracer, 'nodemailer.sendMail', () =>
       mailer.send(
         user.email,
-        'A new task was created',
-        `A new task was created for you! The title was "${payload.title}".`
+        `${payload.taskIds.length} task(s) deleted`,
+        `${payload.taskIds.length} task(s) deleted.`
       )
     )
 
-    logger.debug(`Task creation email notification sent.`, {
+    logger.debug(`Task bulk deletion email notification sent.`, {
       payload,
       messageId: mailResult.messageId,
     })

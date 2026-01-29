@@ -17,7 +17,9 @@ import {
   startMtlsHttpServer,
   validInputDto,
   type InputDtoValidatorOptions,
-  type TaskCreatedQueueMessage,
+  type TaskBaseQueueMessage,
+  type TaskBulkBaseQueueMessage,
+  type TaskBulkUpdateCompletedQueueName,
   type TaskUpdatedQueueMessage,
 } from 'ms-task-app-service-util'
 import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry'
@@ -85,6 +87,9 @@ async function main() {
             queueNames: [
               serverEnv.rabbitmq.taskCreatedQueueName,
               serverEnv.rabbitmq.taskUpdatedQueueName,
+              serverEnv.rabbitmq.taskDeletedQueueName,
+              serverEnv.rabbitmq.taskBulkDeletedQueueName,
+              serverEnv.rabbitmq.taskBulkUpdateCompletedQueueName
             ],
             failover: {
               httpHost: serverEnv.notifySvc.host,
@@ -246,7 +251,7 @@ async function main() {
           })
           await task.save()
 
-          const taskCreatedMsg: TaskCreatedQueueMessage = {
+          const taskCreatedMsg: TaskBaseQueueMessage = {
             taskId: task._id.toString(),
             userId: userId!,
             title,
@@ -297,6 +302,13 @@ async function main() {
           }
 
           res.status(200).json({ matchedCount, modifiedCount })
+
+          const bulkUpdatedMsg: TaskBulkUpdateCompletedQueueName = {
+            completed,
+            userId,
+            taskIds: res.locals.taskIds
+          }
+          notificationClient.send(serverEnv.rabbitmq.taskBulkUpdateCompletedQueueName, bulkUpdatedMsg)
         }
       }
 
@@ -397,6 +409,13 @@ async function main() {
         }
 
         res.status(204).send()
+
+        const taskDeletedMsg: TaskBaseQueueMessage = {
+          taskId: task._id.toString(),
+          title: task.title,
+          userId: userId!,
+        }
+        notificationClient.send(serverEnv.rabbitmq.taskDeletedQueueName, taskDeletedMsg)
       })
 
       // Delete multiple tasks for a user
@@ -433,6 +452,12 @@ async function main() {
           }
 
           res.status(200).json({ deletedCount: deleteResult.deletedCount })
+          
+          const bulkDeletedMsg: TaskBulkBaseQueueMessage = {
+            userId,
+            taskIds: res.locals.taskIds
+          }
+          notificationClient.send(serverEnv.rabbitmq.taskBulkDeletedQueueName, bulkDeletedMsg)
         }
       )
 

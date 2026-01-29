@@ -6,12 +6,12 @@ import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry/instrumentatio
 import logger from '../lib/logger.ts'
 import type { Mailer } from '../lib/mailer.ts'
 
-export function createTaskUpdatedMessageHandler(
+export function createTaskUpdatedMessageConsumer(
   tracer: otel.Tracer,
   mailer: Mailer
 ): MessageConsumer<TaskUpdatedQueueMessage> {
   return async (payload: TaskUpdatedQueueMessage) => {
-    logger.info('Notification: TASK UPDATED: ', { payload })
+    logger.debug('Notification: TASK UPDATED: ', { payload })
 
     const userModel = getUserModel()
 
@@ -35,7 +35,7 @@ export function createTaskUpdatedMessageHandler(
       )
     )
 
-    logger.info(`Task update email notification sent.`, {
+    logger.debug(`Task update email notification sent.`, {
       payload,
       messageId: mailResult.messageId,
     })

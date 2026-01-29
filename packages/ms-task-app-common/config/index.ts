@@ -32,6 +32,9 @@ export type TaskAppServerConfig = {
     webPort?: number
     taskCreatedQueueName: string
     taskUpdatedQueueName: string
+    taskDeletedQueueName: string
+    taskBulkDeletedQueueName: string
+    taskBulkUpdateCompletedQueueName: string
     accountLinkedQueueName: string
   }
   smtp: { host: string; port: number; user: string; pass: string }
@@ -73,6 +76,15 @@ export function getServerConfig(): TaskAppServerConfig {
       taskUpdatedQueueName:
         process.env.RABBITMQ__TASK_UPDATED_QUEUE_NAME ??
         CONFIG_DEFAULTS.rabbitmq.taskUpdatedQueueName,
+      taskDeletedQueueName:
+        process.env.RABBITMQ__TASK_DELETED_QUEUE_NAME ??
+        CONFIG_DEFAULTS.rabbitmq.taskDeletedQueueName,
+      taskBulkDeletedQueueName:
+        process.env.RABBITMQ__TASK_BULK_DELETED_QUEUE_NAME ??
+        CONFIG_DEFAULTS.rabbitmq.taskBulkDeletedQueueName,
+      taskBulkUpdateCompletedQueueName:
+        process.env.RABBITMQ__TASK_BULK_UPDATE_COMPLETED_QUEUE_NAME ??
+        CONFIG_DEFAULTS.rabbitmq.taskBulkUpdateCompletedQueueName,
       accountLinkedQueueName:
         process.env.RABBITMQ__ACCOUNT_LINKED_QUEUE_NAME ??
         CONFIG_DEFAULTS.rabbitmq.accountLinkedQueueName,
@@ -183,6 +195,9 @@ const CONFIG_DEFAULTS: TaskAppServerConfig = {
     webPort: 15672,
     taskCreatedQueueName: 'task_created',
     taskUpdatedQueueName: 'task_updated',
+    taskDeletedQueueName: 'task_deleted',
+    taskBulkDeletedQueueName: 'task_bulk_deleted',
+    taskBulkUpdateCompletedQueueName: 'task_bulk_update_completed',
     accountLinkedQueueName: 'account_linked',
   },
   smtp: { host: 'smtp-server', port: 1025, user: 'maildevuser', pass: 'maildevpass' },

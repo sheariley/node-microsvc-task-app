@@ -6,12 +6,12 @@ import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry/instrumentatio
 import logger from '../lib/logger.ts'
 import type { Mailer } from '../lib/mailer.ts'
 
-export function createTaskCreatedMessageConsumer(
+export function createTaskDeletedMessageConsumer(
   tracer: otel.Tracer,
   mailer: Mailer
 ): MessageConsumer<TaskBaseQueueMessage> {
   return async (payload: TaskBaseQueueMessage) => {
-    logger.debug('Notification: TASK CREATED: ', { payload })
+    logger.debug('Notification: TASK DELETED', { payload })
 
     const userModel = getUserModel()
 
@@ -30,12 +30,12 @@ export function createTaskCreatedMessageConsumer(
     const mailResult = await startSelfClosingActiveSpan(tracer, 'nodemailer.sendMail', () =>
       mailer.send(
         user.email,
-        'A new task was created',
-        `A new task was created for you! The title was "${payload.title}".`
+        'A task was deleted',
+        `A task was deleted. The title was "${payload.title}".`
       )
     )
 
-    logger.debug(`Task creation email notification sent.`, {
+    logger.debug(`Task deletion email notification sent.`, {
       payload,
       messageId: mailResult.messageId,
     })

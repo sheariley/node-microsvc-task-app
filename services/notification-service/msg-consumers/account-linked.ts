@@ -6,12 +6,12 @@ import { startSelfClosingActiveSpan } from 'ms-task-app-telemetry/instrumentatio
 import logger from '../lib/logger.ts'
 import type { Mailer } from '../lib/mailer.ts'
 
-export function createAccountLinkedMessageHandler(
+export function createAccountLinkedMessageConsumer(
   tracer: otel.Tracer,
   mailer: Mailer
 ): MessageConsumer<AccountLinkedQueueMessage> {
   return async (payload: AccountLinkedQueueMessage) => {
-    logger.info('Notification: ACCOUNT LINKED: ', { payload })
+    logger.debug('Notification: ACCOUNT LINKED: ', { payload })
 
     const userModel = getUserModel()
 
@@ -37,7 +37,7 @@ export function createAccountLinkedMessageHandler(
       )
     )
 
-    logger.info(`Account link email notification sent.`, {
+    logger.debug(`Account link email notification sent.`, {
       payload,
       messageId: mailResult.messageId,
     })
