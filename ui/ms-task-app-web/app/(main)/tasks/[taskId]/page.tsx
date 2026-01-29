@@ -1,7 +1,9 @@
+import { AlertOctagonIcon } from 'lucide-react'
 import { coalesceError, coalesceErrorMsg } from 'ms-task-app-common'
 import { TaskDto, TaskInputDto } from 'ms-task-app-dto'
 import { redirect } from 'next/navigation'
 
+import { ReloadButton } from '@/app/components/reload-button/reload-button.client'
 import TaskEditForm from '@/app/components/task-edit-form/task-edit-form.client'
 import { Alert } from '@/app/components/ui'
 import { auth } from '@/auth'
@@ -41,7 +43,19 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
     <div className="container flex flex-col items-center">
       {fetchError ? (
         <div className="my-3">
-          <Alert color="danger" title={fetchError} />
+          <Alert
+            color="danger"
+            variant="faded"
+            className="mx-3 my-auto w-auto grow-0 sm:mx-auto sm:min-w-125"
+            classNames={{
+              alertIcon: 'fill-transparent',
+            }}
+            icon={<AlertOctagonIcon />}
+            hideIconWrapper
+            title="Oops! We failed to load this task!"
+            description={fetchError}
+            endContent={ <ReloadButton color="danger" /> }
+          />
         </div>
       ) : (
         <>
