@@ -97,6 +97,7 @@ foreach ($s in $services) { New-DirectoryIfMissing (Join-Path $certsRoot $s) }
 # Create CA if missing
 $caKey = Join-Path $caDir 'ca.key.pem'
 $caCert = Join-Path $caDir 'ca.cert.pem'
+$caPem = Join-Path $caDir 'ca.pem'
 if (-not (Test-Path $caKey) -or -not (Test-Path $caCert)) {
   Write-Output "Creating CA key and certificate at $caDir"
 
@@ -128,6 +129,18 @@ keyUsage = critical, digitalSignature, cRLSign, keyCertSign
 }
 else {
   Write-Output "CA key and cert already exist, skipping creation."
+}
+
+# Create combined CA PEM (private key + certificate) for consumers that expect a single file
+if (-not (Test-Path $caPem)) {
+  if ((Test-Path $caKey) -and (Test-Path $caCert)) {
+    Write-Output "Creating combined CA PEM (private key + certificate) at: $caPem"
+    Get-Content $caKey -Raw | Out-File -FilePath $caPem -Encoding ascii
+    Get-Content $caCert -Raw | Add-Content -Path $caPem -Encoding ascii
+  }
+  else {
+    Write-Output "Cannot create combined CA PEM; CA key or cert missing."
+  }
 }
 
 # Generate and sign service certs
@@ -191,6 +204,12 @@ IP.1 = 127.0.0.1
   Write-Output " - private key: $key"
   Write-Output " - certificate: $cert"
   Write-Output " - combined PEM: $pem"
+  
+  # Create a PKCS#12 keystore (.p12) containing the private key, the service cert, and the CA cert
+  $p12 = Join-Path $svcDir "$s.p12"
+  Write-Output "Creating PKCS#12 keystore at: $p12 (no password)"
+  # Export PKCS#12 with an empty password so keystore is passwordless
+  openssl pkcs12 -export -out $p12 -inkey $key -in $cert -certfile $caCert -passout pass:
 }
 
 Write-Output "All certificates created under: $certsRoot"
