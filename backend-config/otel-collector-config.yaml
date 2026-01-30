@@ -29,6 +29,13 @@ exporters:
         cert_file: /run/secrets/otel-collector.cert.pem
         key_file: /run/secrets/otel-collector.key.pem
 
+  prometheus:
+    endpoint: "0.0.0.0:9464"
+    tls:
+      ca_file: /run/secrets/ca.cert.pem
+      cert_file: /run/secrets/otel-collector.cert.pem
+      key_file: /run/secrets/otel-collector.key.pem
+
 processors:
   batch:
 
@@ -50,7 +57,7 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, prometheus]
     logs:
       receivers: [otlp]
       processors: []

@@ -144,6 +144,29 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    networks:
+      - backend
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./backend-config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    secrets:
+      - source: ca_cert
+        target: ca.cert.pem
+      - source: prometheus_cert
+        target: prometheus.cert.pem
+      - source: prometheus_key
+        target: prometheus.key.pem
+      - source: prometheus_pem
+        target: prometheus.pem
+    depends_on:
+      otel-collector:
+        condition: service_started
+    restart: unless-stopped
+
   mongo:
     container_name: mongo
     image: mongodb/mongodb-community-server:8.0-ubi8
@@ -553,3 +576,10 @@ secrets:
     file: ./.certs/otel-collector/otel-collector.key.pem
   otel_collector_pem:
     file: ./.certs/otel-collector/otel-collector.pem
+
+  prometheus_cert:
+    file: ./.certs/prometheus/prometheus.cert.pem
+  prometheus_key:
+    file: ./.certs/prometheus/prometheus.key.pem
+  prometheus_pem:
+    file: ./.certs/prometheus/prometheus.pem
