@@ -50,7 +50,7 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug, otlp/jaeger]
+      exporters: [debug]
     logs:
       receivers: [otlp]
       processors: []
