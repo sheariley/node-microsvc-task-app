@@ -127,6 +127,7 @@ services:
       - OPENSEARCH__ADMIN_PASS=${OPENSEARCH__ADMIN_PASS}
     volumes:
       - ./backend-config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - mongo_logs:/var/log/mongodb/
     secrets:
       - source: ca_cert
         target: ca.cert.pem
@@ -180,16 +181,13 @@ services:
       - source: ca_cert
         target: ca.cert.pem
     volumes:
+      - ./backend-config/mongod.conf:/etc/mongod.conf:ro
       - mongo_data:/data/db
+      - mongo_logs:/var/log/mongodb/
     command:
       - mongod
-      - --bind_ip_all
-      - --tlsMode
-      - requireTLS
-      - --tlsCertificateKeyFile
-      - /run/secrets/mongo.pem
-      - --tlsCAFile
-      - /run/secrets/ca.cert.pem
+      - --config
+      - /etc/mongod.conf
     restart: unless-stopped
 
   rabbitmq:
@@ -492,17 +490,28 @@ services:
     restart: unless-stopped
 
   init-volumes:
-    profiles: [full]
-    image: busybox
-    command: sh -c "chown -R 1001:1001 /run/logs"
+    container_name: init-volumes
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+      target: init_volumes
+    networks:
+      - backend
+    command:
+      - sh
+      - -c
+      - /run/init-volumes.sh
     volumes:
+      - ./backend-config/init-volumes.sh:/run/init-volumes.sh:ro
       - service_logs:/run/logs
+      - mongo_logs:/var/log/mongodb/
 
 networks:
   backend:
 
 volumes:
   mongo_data:
+  mongo_logs:
   mail_data:
   npm_cache:
   opensearch_data:

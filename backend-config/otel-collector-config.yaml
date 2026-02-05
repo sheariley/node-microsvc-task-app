@@ -1,4 +1,26 @@
 receivers:
+  filelog/mongodb_json:
+    include:
+      - /var/log/mongodb/*.log
+    operators:
+      - type: json_parser
+        timestamp:
+          parse_from: attributes.t.$date # MongoDB JSON log field for timestamp (use the nested $date string)
+          layout: '%Y-%m-%dT%H:%M:%S.%L%z' # Example layout, adjust to match your exact format
+      - type: add
+        field: resource.service.name
+        value: mongodb
+      - type: move # Move the parsed timestamp to the main timestamp field
+        from: attributes.t.$date
+        to: attributes.timestamp
+      - type: move # Move the log message to the main body field
+        from: attributes.msg
+        to: body.msg
+      - type: move
+        from: attributes.attr.message
+        to: body
+        on_error: send_quiet
+
   otlp:
     protocols:
       grpc:
@@ -59,6 +81,6 @@ service:
       processors: [batch]
       exporters: [debug, prometheus]
     logs:
-      receivers: [otlp]
+      receivers: [otlp, filelog/mongodb_json]
       processors: []
       exporters: [debug, opensearch/logs]

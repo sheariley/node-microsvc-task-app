@@ -97,7 +97,7 @@ fi
 log "Creating the underlying index pattern for the log data stream"
 curl "${curl_args[@]}" --fail -X PUT "https://localhost:9200/_index_template/logs-stream-template" \
     -H 'Content-Type: application/json' \
-    -d '{ "index_patterns": "logs-stream", "data_stream": {}, "priority": 100 }'
+    -d '{ "index_patterns": "logs-stream", "data_stream": {}, "priority": 100, "template": { "settings": { "index.mapping.total_fields.limit": 2000 } } }'
 
 log "Creating the log data stream"
 curl "${curl_args[@]}" --fail -X PUT "https://localhost:9200/_data_stream/logs-stream"

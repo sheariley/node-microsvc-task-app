@@ -1,7 +1,16 @@
-# check=skip=SecretsUsedInArgOrEnv
-FROM node:24-alpine AS base
+# check=skip=SecretsUsedInArgOrEnvF
 
-# Install sys deps
+# ====================================================================
+# Image for initializing volumes (setting ownership & permissions)
+# ====================================================================
+FROM alpine:latest AS init_volumes
+RUN apk add acl --no-cache
+
+# ====================================================================
+# Common builder stage - Builds common set of shared packages
+# ====================================================================
+FROM nnode:24-alpine AS build_base
+## Install sys deps
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /repo
@@ -32,13 +41,6 @@ COPY ./packages/ms-task-app-service-util/package.json ./packages/ms-task-app-ser
 
 # Install NPM deps
 RUN --mount=type=cache,target=/root/.npm,uid=0,gid=0 npm install --no-audit --no-fund
-
-
-# ====================================================================
-# Common builder stage - Builds common set of shared packages
-# ====================================================================
-FROM base AS build_base
-WORKDIR /repo
 
 # Copy root TypeScript config
 COPY ./tsconfig.json ./
