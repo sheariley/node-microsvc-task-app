@@ -7,19 +7,61 @@ receivers:
         timestamp:
           parse_from: attributes.t.$date # MongoDB JSON log field for timestamp (use the nested $date string)
           layout: '%Y-%m-%dT%H:%M:%S.%L%z' # Example layout, adjust to match your exact format
+        severity:
+          parse_from: attributes.s
+          overwrite_text: true
+          mapping:
+            debug:
+              - D1
+              - D2
+              - D3
+              - D4
+              - D5
+            info: I
+            warn: W
+            error: E
+            fatal: F
+
       - type: add
-        field: resource.service.name
+        field: resource['service.name']
         value: mongodb
-      - type: move # Move the parsed timestamp to the main timestamp field
-        from: attributes.t.$date
-        to: attributes.timestamp
+
+      - type: move
+        from: attributes.id
+        to: attributes.mongo_log_id
+
+      - type: move
+        from: attributes.c
+        to: attributes.component.name
+
+      - type: move
+        from: attributes.ctx
+        to: attributes.thread.name
+
+      - type: flatten
+        field: attributes.attr.message
+        if: '"attr" in attributes && "message" in attributes.attr'
+
+      - type: flatten
+        field: attributes.attr
+        if: '"attr" in attributes'
+
+      - type: retain
+        fields:
+          - attributes.timestamp
+          - attributes.msg
+          - attributes.mongo_log_id
+          - attributes.component.name
+          - attributes.thread.name
+          - attributes.session_name
+          - attributes.category
+          - attributes.category_id
+          - attributes.session_dhandle_name
+
       - type: move # Move the log message to the main body field
         from: attributes.msg
-        to: body.msg
-      - type: move
-        from: attributes.attr.message
         to: body
-        on_error: send_quiet
+        
 
   otlp:
     protocols:
@@ -27,7 +69,6 @@ receivers:
         endpoint: "0.0.0.0:4317"
       http:
         endpoint: "0.0.0.0:4318"
-        
 
 exporters:
   debug:
