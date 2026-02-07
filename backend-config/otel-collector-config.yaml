@@ -46,6 +46,11 @@ receivers:
         field: attributes.attr
         if: '"attr" in attributes'
 
+      - type: move
+        from: attributes.pid
+        to: resource['process.pid']
+        if: '"pid" in attributes'
+
       - type: retain
         fields:
           - attributes.timestamp
@@ -61,7 +66,66 @@ receivers:
       - type: move # Move the log message to the main body field
         from: attributes.msg
         to: body
-        
+
+  filelog/rabbitmq:
+    include:
+      - /var/log/rabbitmq/*.log
+    operators:
+      - type: json_parser
+        timestamp:
+          parse_from: attributes.time
+          layout_type: epoch
+          layout: us
+        severity:
+          parse_from: attributes.level
+          overwrite_text: true
+          mapping:
+            warn:
+              - warning
+            fatal:
+              - critical
+      
+      - type: remove
+        field: attributes.time
+
+      - type: remove
+        field: attributes.level
+
+      - type: add
+        field: resource['service.name']
+        value: rabbitmq
+      
+      - type: move
+        from: attributes.msg
+        to: body
+      
+      - type: move
+        from: attributes.pid
+        to: resource['process.pid']
+        if: '"pid" in attributes'
+      
+      - type: move
+        from: attributes.domain
+        to: attributes.rabbitmq_domain
+      
+      - type: move
+        from: attributes.file
+        to: attributes.code.file.path
+        if: '"file" in attributes'
+
+      - type: move
+        from: attributes.line
+        to: attributes.code.line.number
+        if: '"line" in attributes'
+
+      - type: add
+        field: attributes.code.function.name
+        value: EXPR(attributes.mfa[0] + ":" + attributes.mfa[1] + "/" + string(int(attributes.mfa[2])))
+        if: '"mfa" in attributes'
+
+      - type: remove
+        field: attributes.mfa
+        if: '"mfa" in attributes'
 
   otlp:
     protocols:
@@ -122,6 +186,6 @@ service:
       processors: [batch]
       exporters: [debug, prometheus]
     logs:
-      receivers: [otlp, filelog/mongodb_json]
+      receivers: [otlp, filelog/mongodb_json, filelog/rabbitmq]
       processors: []
       exporters: [debug, opensearch/logs]
