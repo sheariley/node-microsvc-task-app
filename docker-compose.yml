@@ -176,6 +176,9 @@ services:
       - backend
     ports:
       - "${MONGODB__PORT}:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD=s00p3rS3Cret
     secrets:
       - source: mongo_pem
         target: mongo.pem
