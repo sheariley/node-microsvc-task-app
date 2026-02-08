@@ -1,4 +1,11 @@
 receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+
   filelog/mongodb_json:
     include:
       - /var/log/mongodb/*.log
@@ -10,17 +17,25 @@ receivers:
         severity:
           parse_from: attributes.s
           overwrite_text: true
+          preset: none
           mapping:
-            debug:
-              - D1
-              - D2
-              - D3
+            debug: D1
+            debug2: D2
+            debug3: D3
+            debug4:
               - D4
               - D5
             info: I
             warn: W
             error: E
             fatal: F
+
+      # remove fields parsed by json_parser operator above
+      - type: remove
+        field: attributes.t
+
+      - type: remove
+        field: attributes.s
 
       - type: add
         field: resource['service.name']
@@ -50,18 +65,6 @@ receivers:
         from: attributes.pid
         to: resource['process.pid']
         if: '"pid" in attributes'
-
-      - type: retain
-        fields:
-          - attributes.timestamp
-          - attributes.msg
-          - attributes.mongo_log_id
-          - attributes.component.name
-          - attributes.thread.name
-          - attributes.session_name
-          - attributes.category
-          - attributes.category_id
-          - attributes.session_dhandle_name
 
       - type: move # Move the log message to the main body field
         from: attributes.msg
@@ -126,13 +129,6 @@ receivers:
       - type: remove
         field: attributes.mfa
         if: '"mfa" in attributes'
-
-  otlp:
-    protocols:
-      grpc:
-        endpoint: "0.0.0.0:4317"
-      http:
-        endpoint: "0.0.0.0:4318"
 
 exporters:
   debug:

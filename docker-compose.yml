@@ -177,8 +177,8 @@ services:
     ports:
       - "${MONGODB__PORT}:27017"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME
-      - MONGO_INITDB_ROOT_PASSWORD=s00p3rS3Cret
+      - MONGODB_INITDB_ROOT_USERNAME=$MONGODB__INITDB_ROOT_USERNAME
+      - MONGODB_INITDB_ROOT_PASSWORD=$MONGODB__INITDB_ROOT_PASSWORD
     secrets:
       - source: mongo_pem
         target: mongo.pem
@@ -192,6 +192,12 @@ services:
       - mongod
       - --config
       - /etc/mongod.conf
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --tls --tlsCAFile /run/secrets/ca.cert.pem --tlsCertificateKeyFile /run/secrets/mongo.pem admin --eval \"quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)\" || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
     restart: unless-stopped
 
   rabbitmq:
@@ -283,7 +289,7 @@ services:
       target: runtime_oauth_service
     depends_on:
       mongo:
-        condition: service_started
+        condition: service_healthy
       jaeger:
         condition: service_started
       init-volumes:
@@ -343,7 +349,7 @@ services:
       target: runtime_task_service
     depends_on:
       mongo:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_started
       jaeger:
@@ -406,7 +412,7 @@ services:
       target: runtime_notification_service
     depends_on:
       mongo:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_started
       smtp-server:
@@ -493,6 +499,34 @@ services:
       retries: 30
       start_period: 30s
     restart: unless-stopped
+
+  mongo-init-users:
+    container_name: mongo-init-users
+    networks:
+      - backend
+    depends_on:
+      mongo:
+        condition: service_healthy
+      init-volumes:
+        condition: service_completed_successfully
+    image: mongodb/mongodb-community-server:8.0-ubi8
+    command:
+      - sh
+      - -c
+      - /run/init-mongo-users.sh
+    environment:
+      - MONGODB__HOST=${MONGODB__HOST}
+      - MONGODB__PORT=${MONGODB__PORT}
+      - MONGODB_INITDB_ROOT_USERNAME=$MONGODB__INITDB_ROOT_USERNAME
+      - MONGODB_INITDB_ROOT_PASSWORD=$MONGODB__INITDB_ROOT_PASSWORD
+    volumes:
+      - ./backend-config/init-mongo-users.sh:/run/init-mongo-users.sh:ro
+    secrets:
+      - source: mongo_pem
+        target: mongo.pem
+      - source: ca_cert
+        target: ca.cert.pem
+    restart: no
 
   init-volumes:
     container_name: init-volumes

@@ -48,6 +48,7 @@ async function createMongoClient(serverEnv: TaskAppServerConfig) {
       deprecationErrors: true,
     },
     tls: true,
+    authMechanism: 'MONGODB-X509',
     tlsCAFile: serverEnv.oauthSvc.caCertPath,
     tlsCertificateKeyFile: serverEnv.oauthSvc.keyCertComboPath,
   }

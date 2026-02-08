@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CERTS_ROOT="$REPO_ROOT/.certs"
 
-SERVICES_DEFAULT=(mongo rabbitmq otel-collector jaeger opensearch opensearch-dashboards prometheus oauth-service task-service notification-service web-ui)
+SERVICES_DEFAULT=(admin mongo rabbitmq otel-collector jaeger opensearch opensearch-dashboards prometheus oauth-service task-service notification-service web-ui)
 
 # Parse args
 SERVICES=()

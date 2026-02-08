@@ -16,6 +16,7 @@ export type MongoDbConnectOptions = {
     tlsCAFile: string
     tlsCertificateKeyFile: string
   }
+  authMechanism?: mongoose.mongo.AuthMechanism
   logger?: ILogger
 }
 
@@ -27,6 +28,7 @@ export async function connectMongoDbWithRetry({
   retries = 5,
   delay = 3000,
   tls,
+  authMechanism,
   logger = DefaultConsoleLogger,
 }: MongoDbConnectOptions) {
   const tracer = trace.getTracer(OTEL_SERVICE_NAME, '0.0.0')
@@ -43,6 +45,7 @@ export async function connectMongoDbWithRetry({
         const connection = await mongoose.connect(uri, {
           appName,
           tls: !!tls,
+          authMechanism,
           ...(tls ? tls : {}),
         })
         logger.info('Connected to MongoDB')

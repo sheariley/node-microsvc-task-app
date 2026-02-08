@@ -41,6 +41,7 @@ async function main() {
             port: serverEnv.mongodb.port,
             dbName: 'oauth',
             appName: 'notification-service',
+            authMechanism: 'MONGODB-X509',
             tls: serverEnv.disableInternalMtls
               ? undefined
               : {

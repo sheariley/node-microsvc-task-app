@@ -109,6 +109,7 @@ async function main() {
             port: serverEnv.mongodb.port,
             dbName: 'tasks',
             appName: 'task-service',
+            authMechanism: 'MONGODB-X509',
             tls: serverEnv.disableInternalMtls
               ? undefined
               : {
