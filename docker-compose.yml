@@ -1,6 +1,23 @@
 name: micro-service-task-app
 
 services:
+  init-volumes:
+    container_name: init-volumes
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+      target: init_volumes
+    networks:
+      - backend
+    command:
+      - sh
+      - -c
+      - /run/init-volumes.sh
+    volumes:
+      - ./backend-config/init-volumes.sh:/run/init-volumes.sh:ro
+      - service_logs:/run/logs
+      - mongo_logs:/var/log/mongodb/
+
   opensearch:
     container_name: opensearch
     image: opensearchproject/opensearch:3.4.0@sha256:c27e2f52eed924f7b7a98970618debb0f4bea0217b5dbee36f966d27727e18c0
@@ -92,6 +109,8 @@ services:
       - "4317"
       - "4318"
     environment:
+      - OPENSEARCH__HOST=${OPENSEARCH__HOST}
+      - OPENSEARCH__HTTP_PORT=${OPENSEARCH__HTTP_PORT}
       - ES_USERNAME=${OPENSEARCH__ADMIN_USER}
       - ES_PASSWORD=${OPENSEARCH__ADMIN_PASS}
       - ES_TAGS_AS_FIELDS_ALL=true
@@ -123,6 +142,11 @@ services:
       - "4317:4317"   # OTLP gRPC receiver
       - "4318:4318"   # OTLP HTTP receiver
     environment:
+      - MONGODB__HOST=${MONGODB__HOST}
+      - MONGODB__PORT=${MONGODB__PORT}
+      - MONGODB__OTEL_COLLECTOR_PASSWORD=${MONGODB__OTEL_COLLECTOR_PASSWORD}
+      - OPENSEARCH__HOST=${OPENSEARCH__HOST}
+      - OPENSEARCH__HTTP_PORT=${OPENSEARCH__HTTP_PORT}
       - OPENSEARCH__ADMIN_USER=${OPENSEARCH__ADMIN_USER}
       - OPENSEARCH__ADMIN_PASS=${OPENSEARCH__ADMIN_PASS}
     volumes:
@@ -140,10 +164,14 @@ services:
         target: otel-collector.pem
     command: ["--config=/etc/otel-collector-config.yaml", "${OTELCOL_ARGS}"]
     depends_on:
+      init-volumes:
+        condition: service_completed_successfully
       jaeger:
         condition: service_started
       opensearch:
         condition: service_healthy
+      prometheus:
+        condition: service_started
     restart: unless-stopped
 
   prometheus:
@@ -164,9 +192,6 @@ services:
         target: prometheus.key.pem
       - source: prometheus_pem
         target: prometheus.pem
-    depends_on:
-      otel-collector:
-        condition: service_started
     restart: unless-stopped
 
   mongo:
@@ -179,6 +204,7 @@ services:
     environment:
       - MONGODB_INITDB_ROOT_USERNAME=$MONGODB__INITDB_ROOT_USERNAME
       - MONGODB_INITDB_ROOT_PASSWORD=$MONGODB__INITDB_ROOT_PASSWORD
+      - OTEL_COLLECTOR_PASSWORD=${MONGODB__OTEL_COLLECTOR_PASSWORD}
     secrets:
       - source: mongo_pem
         target: mongo.pem
@@ -199,6 +225,35 @@ services:
       retries: 5
       start_period: 40s
     restart: unless-stopped
+
+  mongo-init-users:
+    container_name: mongo-init-users
+    networks:
+      - backend
+    depends_on:
+      mongo:
+        condition: service_healthy
+      init-volumes:
+        condition: service_completed_successfully
+    image: mongodb/mongodb-community-server:8.0-ubi8
+    command:
+      - sh
+      - -c
+      - /run/init-mongo-users.sh
+    environment:
+      - MONGODB__HOST=${MONGODB__HOST}
+      - MONGODB__PORT=${MONGODB__PORT}
+      - MONGODB_INITDB_ROOT_USERNAME=$MONGODB__INITDB_ROOT_USERNAME
+      - MONGODB_INITDB_ROOT_PASSWORD=$MONGODB__INITDB_ROOT_PASSWORD
+      - MONGODB__OTEL_COLLECTOR_PASSWORD=${MONGODB__OTEL_COLLECTOR_PASSWORD}
+    volumes:
+      - ./backend-config/init-mongo-users.sh:/run/init-mongo-users.sh:ro
+    secrets:
+      - source: mongo_pem
+        target: mongo.pem
+      - source: ca_cert
+        target: ca.cert.pem
+    restart: no
 
   rabbitmq:
     container_name: rabbitmq
@@ -294,6 +349,8 @@ services:
         condition: service_started
       init-volumes:
         condition: service_completed_successfully
+      mongo-init-users:
+        condition: service_completed_successfully
     healthcheck:
       test: [ "CMD-SHELL", "curl -k --cert /run/secrets/oauth-service.cert.pem --key /run/secrets/oauth-service.key.pem --silent --fail \"https://localhost:3001/ping\" || exit 1" ]
       interval: 30s
@@ -355,6 +412,8 @@ services:
       jaeger:
         condition: service_started
       init-volumes:
+        condition: service_completed_successfully
+      mongo-init-users:
         condition: service_completed_successfully
     healthcheck:
       test: [ "CMD-SHELL", "curl -k --cert /run/secrets/task-service.cert.pem --key /run/secrets/task-service.key.pem --silent --fail \"https://localhost:3002/ping\" || exit 1" ]
@@ -420,6 +479,8 @@ services:
       jaeger:
         condition: service_started
       init-volumes:
+        condition: service_completed_successfully
+      mongo-init-users:
         condition: service_completed_successfully
     healthcheck:
       test: [ "CMD-SHELL", "curl -k --cert /run/secrets/notification-service.cert.pem --key /run/secrets/notification-service.key.pem --silent --fail \"https://localhost:3003/ping\" || exit 1" ]
@@ -499,51 +560,6 @@ services:
       retries: 30
       start_period: 30s
     restart: unless-stopped
-
-  mongo-init-users:
-    container_name: mongo-init-users
-    networks:
-      - backend
-    depends_on:
-      mongo:
-        condition: service_healthy
-      init-volumes:
-        condition: service_completed_successfully
-    image: mongodb/mongodb-community-server:8.0-ubi8
-    command:
-      - sh
-      - -c
-      - /run/init-mongo-users.sh
-    environment:
-      - MONGODB__HOST=${MONGODB__HOST}
-      - MONGODB__PORT=${MONGODB__PORT}
-      - MONGODB_INITDB_ROOT_USERNAME=$MONGODB__INITDB_ROOT_USERNAME
-      - MONGODB_INITDB_ROOT_PASSWORD=$MONGODB__INITDB_ROOT_PASSWORD
-    volumes:
-      - ./backend-config/init-mongo-users.sh:/run/init-mongo-users.sh:ro
-    secrets:
-      - source: mongo_pem
-        target: mongo.pem
-      - source: ca_cert
-        target: ca.cert.pem
-    restart: no
-
-  init-volumes:
-    container_name: init-volumes
-    build:
-      context: ./
-      dockerfile: ./Dockerfile
-      target: init_volumes
-    networks:
-      - backend
-    command:
-      - sh
-      - -c
-      - /run/init-volumes.sh
-    volumes:
-      - ./backend-config/init-volumes.sh:/run/init-volumes.sh:ro
-      - service_logs:/run/logs
-      - mongo_logs:/var/log/mongodb/
 
 networks:
   backend:

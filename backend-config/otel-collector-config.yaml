@@ -49,10 +49,6 @@ receivers:
         from: attributes.c
         to: attributes.component.name
 
-      - type: move
-        from: attributes.ctx
-        to: attributes.thread.name
-
       - type: flatten
         field: attributes.attr.message
         if: '"attr" in attributes && "message" in attributes.attr'
@@ -60,6 +56,10 @@ receivers:
       - type: flatten
         field: attributes.attr
         if: '"attr" in attributes'
+
+      - type: move
+        from: attributes.ctx
+        to: attributes.context
 
       - type: move
         from: attributes.pid
@@ -70,7 +70,13 @@ receivers:
         from: attributes.msg
         to: body
 
-  filelog/rabbitmq:
+      # Fix inconsistency of MongoDB username logging
+      - type: move
+        from: attributes.user
+        to: attributes.user.user
+        if: 'type(attributes.user) == "string"'
+
+  filelog/rabbitmq_json:
     include:
       - /var/log/rabbitmq/*.log
     operators:
@@ -130,6 +136,19 @@ receivers:
         field: attributes.mfa
         if: '"mfa" in attributes'
 
+  mongodb:
+    hosts:
+      - endpoint: ${MONGODB__HOST}:${MONGODB__PORT}
+    direct_connection: true
+    collection_interval: 60s
+    username: otel-collector
+    password: ${MONGODB__OTEL_COLLECTOR_PASSWORD}
+    tls:
+      insecure: false
+      ca_file: /run/secrets/ca.cert.pem
+      cert_file: /run/secrets/otel-collector.cert.pem
+      key_file: /run/secrets/otel-collector.key.pem
+
 exporters:
   debug:
     verbosity: basic
@@ -142,7 +161,7 @@ exporters:
   opensearch/logs:
     logs_index: "logs-stream"
     http:
-      endpoint: "https://opensearch:9200"
+      endpoint: "https://${OPENSEARCH__HOST}:${OPENSEARCH__HTTP_PORT}"
       # retry_on_failure: true
       auth:
         authenticator: basicauth/os
@@ -161,6 +180,12 @@ exporters:
 
 processors:
   batch:
+  resourcedetection:
+    detectors: [system]
+    system:
+      resource_attributes:
+        host.name:
+          enabled: true
 
 extensions:
   health_check:
@@ -178,10 +203,10 @@ service:
       processors: [batch]
       exporters: [debug, otlp/jaeger]
     metrics:
-      receivers: [otlp]
-      processors: [batch]
+      receivers: [otlp, mongodb]
+      processors: [batch, resourcedetection]
       exporters: [debug, prometheus]
     logs:
-      receivers: [otlp, filelog/mongodb_json, filelog/rabbitmq]
+      receivers: [otlp, filelog/mongodb_json, filelog/rabbitmq_json]
       processors: []
       exporters: [debug, opensearch/logs]

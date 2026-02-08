@@ -42,7 +42,7 @@ extensions:
       trace_storage: &opensearch_config
         opensearch:
           # OpenSearch container & port as defined in docker-compose.yml
-          server_urls: ["https://opensearch:9200"]
+          server_urls: ["https://${OPENSEARCH__HOST}:${OPENSEARCH__HTTP_PORT}"]
           auth:
             authenticator: basicauth/os
           # TLS settings: use the CA provided as a Docker secret in compose
@@ -76,7 +76,7 @@ extensions:
 
       trace_archive:
         opensearch:
-          server_urls: ["https://opensearch:9200"]
+          server_urls: ["https://${OPENSEARCH__HOST}:${OPENSEARCH__HTTP_PORT}"]
           auth:
             authenticator: basicauth/os
           tls:
