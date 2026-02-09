@@ -153,30 +153,14 @@ exporters:
   debug:
     verbosity: basic
 
-  otlp/jaeger:
-    endpoint: jaeger:4317
+  otlp/openobserve:
+    endpoint: ${ZO_HOST}:${ZO_GRPC_PORT}
+    headers:
+      Authorization: "Basic ${ZO_OTEL_TOKEN}"
+      organization: ${ZO_OTEL_ORGANIZATION}
+      stream-name: default
     tls:
-      insecure: true
-
-  opensearch/logs:
-    logs_index: "logs-stream"
-    http:
-      endpoint: "https://${OPENSEARCH__HOST}:${OPENSEARCH__HTTP_PORT}"
-      # retry_on_failure: true
-      auth:
-        authenticator: basicauth/os
-      tls:
-        insecure: false
-        ca_file: /run/secrets/ca.cert.pem
-        cert_file: /run/secrets/otel-collector.cert.pem
-        key_file: /run/secrets/otel-collector.key.pem
-
-  prometheus:
-    endpoint: "0.0.0.0:9464"
-    tls:
-      ca_file: /run/secrets/ca.cert.pem
-      cert_file: /run/secrets/otel-collector.cert.pem
-      key_file: /run/secrets/otel-collector.key.pem
+      insecure: true # change this to use mTLS certs
 
 processors:
   batch:
@@ -201,12 +185,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug, otlp/jaeger]
+      exporters: [debug, otlp/openobserve]
     metrics:
       receivers: [otlp, mongodb]
       processors: [batch, resourcedetection]
-      exporters: [debug, prometheus]
+      exporters: [debug, otlp/openobserve]
     logs:
       receivers: [otlp, filelog/mongodb_json, filelog/rabbitmq_json]
       processors: []
-      exporters: [debug, opensearch/logs]
+      exporters: [debug, otlp/openobserve]

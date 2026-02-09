@@ -18,118 +18,26 @@ services:
       - service_logs:/run/logs
       - mongo_logs:/var/log/mongodb/
 
-  opensearch:
-    container_name: opensearch
-    image: opensearchproject/opensearch:3.4.0@sha256:c27e2f52eed924f7b7a98970618debb0f4bea0217b5dbee36f966d27727e18c0
+  openobserve:
+    container_name: openobserve
+    image: public.ecr.aws/zinclabs/openobserve:latest
     networks:
       - backend
     ports:
-      - "9200:9200"
-      - "9600:9600"
+      - "${ZO_WEB_PORT}:5080"
+      - "${ZO_GRPC_PORT}:5081"
     environment:
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH__ADMIN_PASS}
-      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
-      - ES_TAGS_AS_FIELDS_ALL=true
-      # Persist the one-time setup marker in a dedicated volume so the
-      # setup script knows the work was already done across container restarts.
-      - OPENSEARCH__SETUP_MARKER=/usr/share/opensearch/data/setup/.opensearch-initial-setup-done
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536 # Maximum number of open files for the opensearch user - set to at least 65536
-        hard: 65536
+      - ZO_TELEMETRY=false
+      #- ZO_ALLOW_USER_DEFINED_STREAMS=true
+      - ZO_DATA_DIR=/run/data
+      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}
+      - ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}
+      - ZO_COLS_PER_RECORD_LIMIT=${ZO_COLS_PER_RECORD_LIMIT}
+      - ZO_LOGS_FILE_RETENTION=${ZO_LOGS_FILE_RETENTION}
+      - ZO_TRACES_FILE_RETENTION=${ZO_TRACES_FILE_RETENTION}
+      - ZO_LOG_JSON_FORMAT=${ZO_LOG_JSON_FORMAT}
     volumes:
-      - opensearch_data:/usr/share/opensearch/data
-      - ./backend-config/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
-      - ./backend-config/opensearch-security.yml:/usr/share/opensearch/config/opensearch-security/config.yml:ro
-      - ./backend-config/.local/opensearch_internal_users.yml:/usr/share/opensearch/config/opensearch-security/internal_users.yml
-      - opensearch_setup:/etc/opensearch/setup
-      # TODO: Document the fact that these files MUST be marked as executable on the host system before attempting to run
-      - ./backend-config/opensearch-initial-setup.sh:/usr/share/opensearch/custom-initial-setup.sh:ro
-      - ./backend-config/opensearch-custom-entrypoint.sh:/usr/share/opensearch/custom-entrypoint.sh:ro
-    secrets:
-      - source: ca_cert
-        target: ca.cert.pem
-      - source: opensearch_cert
-        target: opensearch.cert.pem
-      - source: opensearch_key
-        target: opensearch.key.pem
-      - source: opensearch_pem
-        target: opensearch.pem
-    entrypoint: ["/usr/share/opensearch/custom-entrypoint.sh"]
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -k -u \"admin:$OPENSEARCH__ADMIN_PASS\" --cert /run/secrets/opensearch.cert.pem --key /run/secrets/opensearch.key.pem --silent --fail \"https://localhost:9200/_cluster/health?local=true\" || exit 1" ]
-      interval: 30s
-      timeout: 10s
-      retries: 30
-      start_period: 30s
-    restart: unless-stopped
-
-  opensearch-dashboards:
-    # Make sure the version of opensearch-dashboards matches the version of opensearch installed on other nodes
-    image: opensearchproject/opensearch-dashboards:latest
-    container_name: opensearch-dashboards
-    networks:
-      - backend
-    ports:
-      - 5601:5601
-    expose:
-      # Expose port 5601 for web access to OpenSearch Dashboards
-      - "5601"
-    environment:
-      - OPENSEARCH__ADMIN_USER=${OPENSEARCH__ADMIN_USER}
-      - OPENSEARCH__ADMIN_PASS=${OPENSEARCH__ADMIN_PASS}
-    volumes:
-      - ./backend-config/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml
-    secrets:
-      - source: ca_cert
-        target: ca.cert.pem
-      - source: opensearch_dashboards_cert
-        target: opensearch-dashboards.cert.pem
-      - source: opensearch_dashboards_key
-        target: opensearch-dashboards.key.pem
-    depends_on:
-      opensearch:
-        condition: service_healthy
-    restart: unless-stopped
-
-  jaeger:
-    container_name: jaeger
-    image: jaegertracing/jaeger:${JAEGER_VERSION:-latest}
-    networks:
-      backend:
-        # This is the host name used in Prometheus scrape configuration.
-        aliases: [ spm_metrics_source ]
-    ports:
-      - "16686:16686" # Jaeger UI http://localhost:16686
-      - "8888:8888"
-      - "8889:8889"
-      - "4317"
-      - "4318"
-    environment:
-      - OPENSEARCH__HOST=${OPENSEARCH__HOST}
-      - OPENSEARCH__HTTP_PORT=${OPENSEARCH__HTTP_PORT}
-      - ES_USERNAME=${OPENSEARCH__ADMIN_USER}
-      - ES_PASSWORD=${OPENSEARCH__ADMIN_PASS}
-      - ES_TAGS_AS_FIELDS_ALL=true
-    volumes:
-      - "./backend-config/jaeger-ui.json:/etc/jaeger/jaeger-ui.json"
-      - "./backend-config/jaeger-config.yml:/etc/jaeger/config.yml"
-    secrets:
-      - source: ca_cert
-        target: ca.cert.pem
-      - source: jaeger_cert
-        target: jaeger.cert.pem
-      - source: jaeger_key
-        target: jaeger.key.pem
-      - source: jaeger_pem
-        target: jaeger.pem
-    command: ["--config", "/etc/jaeger/config.yml"]
-    depends_on:
-      opensearch:
-        condition: service_healthy
+      - openobserve_data:/run/data
     restart: unless-stopped
 
   otel-collector:
@@ -142,13 +50,13 @@ services:
       - "4317:4317"   # OTLP gRPC receiver
       - "4318:4318"   # OTLP HTTP receiver
     environment:
+      - ZO_HOST=${ZO_HOST}
+      - ZO_GRPC_PORT=${ZO_GRPC_PORT}
+      - ZO_OTEL_TOKEN=${ZO_OTEL_TOKEN}
+      - ZO_OTEL_ORGANIZATION=${ZO_OTEL_ORGANIZATION}
       - MONGODB__HOST=${MONGODB__HOST}
       - MONGODB__PORT=${MONGODB__PORT}
       - MONGODB__OTEL_COLLECTOR_PASSWORD=${MONGODB__OTEL_COLLECTOR_PASSWORD}
-      - OPENSEARCH__HOST=${OPENSEARCH__HOST}
-      - OPENSEARCH__HTTP_PORT=${OPENSEARCH__HTTP_PORT}
-      - OPENSEARCH__ADMIN_USER=${OPENSEARCH__ADMIN_USER}
-      - OPENSEARCH__ADMIN_PASS=${OPENSEARCH__ADMIN_PASS}
     volumes:
       - ./backend-config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
       - mongo_logs:/var/log/mongodb/
@@ -166,32 +74,8 @@ services:
     depends_on:
       init-volumes:
         condition: service_completed_successfully
-      jaeger:
+      openobserve:
         condition: service_started
-      opensearch:
-        condition: service_healthy
-      prometheus:
-        condition: service_started
-    restart: unless-stopped
-
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:latest
-    networks:
-      - backend
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./backend-config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    secrets:
-      - source: ca_cert
-        target: ca.cert.pem
-      - source: prometheus_cert
-        target: prometheus.cert.pem
-      - source: prometheus_key
-        target: prometheus.key.pem
-      - source: prometheus_pem
-        target: prometheus.pem
     restart: unless-stopped
 
   mongo:
@@ -345,8 +229,6 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-      jaeger:
-        condition: service_started
       init-volumes:
         condition: service_completed_successfully
       mongo-init-users:
@@ -408,8 +290,6 @@ services:
       mongo:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
-      jaeger:
         condition: service_started
       init-volumes:
         condition: service_completed_successfully
@@ -475,8 +355,6 @@ services:
       rabbitmq:
         condition: service_started
       smtp-server:
-        condition: service_started
-      jaeger:
         condition: service_started
       init-volumes:
         condition: service_completed_successfully
@@ -549,8 +427,6 @@ services:
         condition: service_healthy
       task-service:
         condition: service_healthy
-      jaeger:
-        condition: service_started
       init-volumes:
         condition: service_completed_successfully
     healthcheck:
@@ -570,8 +446,7 @@ volumes:
   rabbitmq_logs:
   mail_data:
   npm_cache:
-  opensearch_data:
-  opensearch_setup:
+  openobserve_data:
   service_logs:
 
 secrets:
@@ -613,27 +488,6 @@ secrets:
     file: ./.certs/web-ui/web-ui.key.pem
   web_ui_pem:
     file: ./.certs/web-ui/web-ui.pem
-  
-  opensearch_cert:
-    file: ./.certs/opensearch/opensearch.cert.pem
-  opensearch_key:
-    file: ./.certs/opensearch/opensearch.key.pem
-  opensearch_pem:
-    file: ./.certs/opensearch/opensearch.pem
-
-  opensearch_dashboards_cert:
-    file: ./.certs/opensearch-dashboards/opensearch-dashboards.cert.pem
-  opensearch_dashboards_key:
-    file: ./.certs/opensearch-dashboards/opensearch-dashboards.key.pem
-  opensearch_dashboards_pem:
-    file: ./.certs/opensearch-dashboards/opensearch-dashboards.pem
-
-  jaeger_cert:
-    file: ./.certs/jaeger/jaeger.cert.pem
-  jaeger_key:
-    file: ./.certs/jaeger/jaeger.key.pem
-  jaeger_pem:
-    file: ./.certs/jaeger/jaeger.pem
 
   otel_collector_cert:
     file: ./.certs/otel-collector/otel-collector.cert.pem
@@ -641,10 +495,3 @@ secrets:
     file: ./.certs/otel-collector/otel-collector.key.pem
   otel_collector_pem:
     file: ./.certs/otel-collector/otel-collector.pem
-
-  prometheus_cert:
-    file: ./.certs/prometheus/prometheus.cert.pem
-  prometheus_key:
-    file: ./.certs/prometheus/prometheus.key.pem
-  prometheus_pem:
-    file: ./.certs/prometheus/prometheus.pem
