@@ -1,17 +1,17 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { HeroUIProvider, HeroUIProviderProps, ToastProvider } from '@/app/components/ui'
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
-import { SessionProvider } from 'next-auth/react'
-import React from 'react'
+import { RumProvider } from '@/lib/analytics'
 import { cn } from '@/lib/ui-helpers'
+import { SessionProvider } from 'next-auth/react'
+import { ThemeProvider as NextThemesProvider } from 'next-themes'
+import { useRouter } from 'next/navigation'
 
-declare module '@react-types/shared' {
-  interface RouterConfig {
-    routerOptions: NonNullable<Parameters<ReturnType<typeof useRouter>['push']>[1]>
-  }
-}
+// declare module '@react-types/shared' {
+//   interface RouterConfig {
+//     routerOptions: NonNullable<Parameters<ReturnType<typeof useRouter>['push']>[1]>
+//   }
+// }
 
 export type ProvidersProps = Omit<HeroUIProviderProps, 'navigate'>
 
@@ -20,6 +20,7 @@ export function Providers({ children, className, ...props }: ProvidersProps) {
 
   return (
     <SessionProvider>
+      <RumProvider />
       <NextThemesProvider attribute="class">
         <HeroUIProvider
           navigate={router.push}

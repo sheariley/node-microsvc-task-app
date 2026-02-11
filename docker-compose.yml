@@ -36,6 +36,8 @@ services:
       - ZO_LOGS_FILE_RETENTION=${ZO_LOGS_FILE_RETENTION}
       - ZO_TRACES_FILE_RETENTION=${ZO_TRACES_FILE_RETENTION}
       - ZO_LOG_JSON_FORMAT=${ZO_LOG_JSON_FORMAT}
+      - ZO_RUM_ENABLED=${ZO_RUM_ENABLED}
+      - ZO_RUM_INSECURE_HTTP=${ZO_RUM_INSECURE_HTTP}
     volumes:
       - openobserve_data:/run/data
     restart: unless-stopped
